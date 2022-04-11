@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-from http.client import REQUEST_URI_TOO_LONG
 import json
 from apa102_pi.driver import apa102
 import time
@@ -30,6 +29,8 @@ class LedStrip:
     # interpolation step-size in each loop of duration 'tick-rate'
     color_interpolation_speed = 0.075
     brightness_interpolation_speed = 0.01
+    condition_paused = threading.Condition()
+
 
     def __init__(self, tick_rate_ms=10, num_led=120):
         # stripe setup
@@ -46,20 +47,12 @@ class LedStrip:
     # Worker thread at fixed time interval (synchronous), allows interpolation
     def loop(self):
         print("[LED Stripe] Start LED Looping")
-        while 1:
-            if self.paused and self.brightness == 0:
-                print("[LED Stripe] Paused LED loop")
-                with self.condition_pause:
-                    ret = self.condition_pause.wait()
-                if not ret:
-                    print("[LED Stripe] End LED Loop after inactivity")
-                    return
-                self.paused = False
-                print("[LED Stripe] Continue LED loop")
-            # Check for cancelled thread
-            if self.running == False:
-                print("[LED Stripe] Stop LED Looping")
-                return
+        while self.running:
+            if self.pause:
+                self.pause = False
+                print("Pause...")
+                with self.condition_paused:
+                    self.condition_paused.wait()
             start_time = time.process_time()
             self.update()
             counter = 0
@@ -77,6 +70,8 @@ class LedStrip:
                     self.brightness_interpolation_speed = self.brightness_interpolation_speed * 1.2
                     self.color_interpolation_speed = self.color_interpolation_speed * 1.2
                     self.tick_rate = self.tick_rate * 1.2
+        print("[LED Stripe] Stop LED Looping")
+        return
 
     def change_mode(self, mode: Mode):
         self.mode = mode
@@ -90,38 +85,49 @@ class LedStrip:
                 self.condition_pause.notify()
 
     # Linear interpolation between desired and current value
-    def interpolate_brightness(self):
+    def interpolate_brightness(self) -> bool:
         # Avoid toggeling at the end of interpolation
         if abs(self.desired_brightness - self.brightness) <= self.brightness_interpolation_speed:
             self.brightness = self.desired_brightness
-            return
+            return False
         if self.desired_brightness > self.brightness:
             self.brightness = self.brightness + self.brightness_interpolation_speed
         elif self.desired_brightness < self.brightness:
             self.brightness = self.brightness - self.brightness_interpolation_speed
+        return True
 
     # Linear interpolation between desired and current value
-    def interpolate_rgb_color(self):
-        self.r = (self.r_desired-self.r)*self.color_interpolation_speed + self.r
-        self.g = (self.g_desired-self.g)*self.color_interpolation_speed + self.g
-        self.b = (self.b_desired-self.b)*self.color_interpolation_speed + self.b
+    def interpolate_rgb_color(self) -> bool:
+        dif_r = self.r_desired-self.r
+        dif_g = self.g_desired-self.g
+        dif_b = self.b_desired-self.b
+        if dif_r == 0 and dif_g == 0 and dif_b == 0:
+            return False
+        self.r = (dif_r)*self.color_interpolation_speed + self.r
+        self.g = (dif_g)*self.color_interpolation_speed + self.g
+        self.b = (dif_b)*self.color_interpolation_speed + self.b
+        return True
         
     def set_brightness(self, b: int):
         self.desired_brightness = (b / 100.0)
+        with self.condition_paused:
+            self.condition_paused.notify()
 
     def set_color(self, color: int):
         self.r_desired, self.g_desired, self.b_desired = self.get_rgb_from_scaled_color(color, scaled=False)
+        with self.condition_paused:
+            self.condition_paused.notify()
 
     # Performs one interpolation step between desired and current LED values and applies changes to the stripe
     def update(self):
-        if self.mode == Mode.SOUND:
+        if self.mode == Mode.NORMAL:
+            if not self.interpolate_brightness() and not self.interpolate_rgb_color():
+                self.pause = True
+        elif self.mode == Mode.SOUND:
             if self.peak_progress >= -1:
                 self.peak()
             if self.brightness < self.min_intensity_sound:
                 self.brightness = self.min_intensity_sound
-        else:
-            self.interpolate_brightness()
-            self.interpolate_rgb_color()
         color = self.get_scaled_color_from_rgb(self.r, self.g, self.b)
         for i in range(1, self.strip.num_led+1):
             self.strip.set_pixel_rgb(i, color)
@@ -206,7 +212,6 @@ class LedStrip:
 
     # interface to publish stream data to strip
     def set_intensity(self, value: int):
-        print('Call peak ', value)
         value_f = value / 100.0
         if value_f > 1.0:
             value_f = 1
