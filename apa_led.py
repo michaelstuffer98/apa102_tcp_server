@@ -27,10 +27,9 @@ class LedStrip:
     mode: Mode = Mode.NORMAL
     looper_thread = threading.Thread
     # interpolation step-size in each loop of duration 'tick-rate'
-    color_interpolation_speed = 0.075
+    color_interpolation_speed = 0.03
     brightness_interpolation_speed = 0.01
-    condition_paused = threading.Condition()
-
+    color_equal_th = 1.0
 
     def __init__(self, tick_rate_ms=10, num_led=120):
         # stripe setup
@@ -42,17 +41,21 @@ class LedStrip:
         # Update-Thread variables
         self.read_table_file('table_peak')
         self.paused = False
-        self.condition_pause = threading.Condition()
+        self.condition_paused = threading.Condition()#
+        self.r_desired = 100
+        self.g_desired = 100
+        self.b_desired = 100
 
     # Worker thread at fixed time interval (synchronous), allows interpolation
     def loop(self):
         print("[LED Stripe] Start LED Looping")
         while self.running:
-            if self.pause:
-                self.pause = False
+            if self.paused:
+                self.paused = False
                 print("Pause...")
                 with self.condition_paused:
                     self.condition_paused.wait()
+                print("Continue...")
             start_time = time.process_time()
             self.update()
             counter = 0
@@ -67,9 +70,8 @@ class LedStrip:
                     self.peak_Step_size = self.peak_Step_size + 1 
                     print('[LED STRIPE] ==> Increased step size (', self.peak_Step_size,')')
                 if self.mode == Mode.NORMAL:
-                    self.brightness_interpolation_speed = self.brightness_interpolation_speed * 1.2
-                    self.color_interpolation_speed = self.color_interpolation_speed * 1.2
-                    self.tick_rate = self.tick_rate * 1.2
+                    # TODO handle too fast loop speed
+                    pass
         print("[LED Stripe] Stop LED Looping")
         return
 
@@ -78,16 +80,17 @@ class LedStrip:
         if mode == Mode.BC or mode == Mode.OFF:
             self.paused = True
         elif mode == Mode.NORMAL:
-            with self.condition_pause:
-                self.condition_pause.notify()
+            with self.condition_paused:
+                self.condition_paused.notify()
         elif mode == Mode.SOUND:
-            with self.condition_pause:
-                self.condition_pause.notify()
+            with self.condition_paused:
+                self.condition_paused.notify()
 
     # Linear interpolation between desired and current value
     def interpolate_brightness(self) -> bool:
         # Avoid toggeling at the end of interpolation
         if abs(self.desired_brightness - self.brightness) <= self.brightness_interpolation_speed:
+            # Goto loop pause mode
             self.brightness = self.desired_brightness
             return False
         if self.desired_brightness > self.brightness:
@@ -101,7 +104,11 @@ class LedStrip:
         dif_r = self.r_desired-self.r
         dif_g = self.g_desired-self.g
         dif_b = self.b_desired-self.b
-        if dif_r == 0 and dif_g == 0 and dif_b == 0:
+        if dif_r <= self.color_equal_th and dif_g <= self.color_equal_th and dif_b <= self.color_equal_th:
+            # Goto loop pause mode 
+            self.r = self.r_desired
+            self.g = self.g_desired
+            self.b = self.b_desired
             return False
         self.r = (dif_r)*self.color_interpolation_speed + self.r
         self.g = (dif_g)*self.color_interpolation_speed + self.g
@@ -122,7 +129,7 @@ class LedStrip:
     def update(self):
         if self.mode == Mode.NORMAL:
             if not self.interpolate_brightness() and not self.interpolate_rgb_color():
-                self.pause = True
+                self.paused = True
         elif self.mode == Mode.SOUND:
             if self.peak_progress >= -1:
                 self.peak()
@@ -172,8 +179,8 @@ class LedStrip:
     def stop(self):
         # Stop the thread
         self.running = False
-        with self.condition_pause:
-            self.condition_pause.notify()
+        with self.condition_paused:
+            self.condition_paused.notify()
         time.sleep(self.tick_rate)
         self.looper_thread = None
         # Reset color LED setup

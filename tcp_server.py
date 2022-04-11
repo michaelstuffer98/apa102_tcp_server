@@ -13,7 +13,7 @@ class TcpServer:
     BUFFER_SIZE: int
     MAX_CLIENTS: int
     MAX_DIGITS_MESSAGE = 4
-    PATTER_COMMAND = re.compile(r'[0-9]+:(-)+[0-9]+')
+    PATTER_COMMAND = re.compile(r'[0-9]+:(-)*[0-9]+')
     controller: Controller
     server_terminated: bool = True
 
