@@ -62,7 +62,6 @@ class Controller:
                 if not found:
                     self.print_log('Command from unregistered client. Skip command...')
                     continue
-                self.print_log('Command Worker Thread evaluating command: ', c.command, ':', c.value)
                 # Execute cmd here
                 cmd_type, ret = self.cmd_switch.switch(c)
                 if not ret is None and not ret == "":

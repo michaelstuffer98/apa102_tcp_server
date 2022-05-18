@@ -50,15 +50,13 @@ class LedStrip:
     def loop(self):
         print("[LED Stripe] Start LED Looping")
         while self.running:
-            if self.paused:
+            counter = 0
+            start_time = time.process_time()
+            working = self.update()
+            if self.paused and not working:
                 self.paused = False
-                print("Pause...")
                 with self.condition_paused:
                     self.condition_paused.wait()
-                print("Continue...")
-            start_time = time.process_time()
-            self.update()
-            counter = 0
             # Wait until loop time expired, synchronous worker
             while (time.process_time() - start_time) <= self.tick_rate:
                 counter = counter + 1
@@ -78,13 +76,15 @@ class LedStrip:
     def change_mode(self, mode: Mode):
         self.mode = mode
         if mode == Mode.BC or mode == Mode.OFF:
-            self.paused = True
+            self.stop()
         elif mode == Mode.NORMAL:
+            self.start()
             with self.condition_paused:
                 self.condition_paused.notify()
         elif mode == Mode.SOUND:
             with self.condition_paused:
                 self.condition_paused.notify()
+
 
     # Linear interpolation between desired and current value
     def interpolate_brightness(self) -> bool:
@@ -126,20 +126,25 @@ class LedStrip:
             self.condition_paused.notify()
 
     # Performs one interpolation step between desired and current LED values and applies changes to the stripe
-    def update(self):
+    def update(self) -> bool:
+        working = True
         if self.mode == Mode.NORMAL:
-            if not self.interpolate_brightness() and not self.interpolate_rgb_color():
+            working = self.interpolate_brightness() or self.interpolate_rgb_color()
+            if not working:
                 self.paused = True
         elif self.mode == Mode.SOUND:
             if self.peak_progress >= -1:
                 self.peak()
             if self.brightness < self.min_intensity_sound:
                 self.brightness = self.min_intensity_sound
+        self.update_strip()
+        return working
+
+    def update_strip(self):
         color = self.get_scaled_color_from_rgb(self.r, self.g, self.b)
         for i in range(1, self.strip.num_led+1):
             self.strip.set_pixel_rgb(i, color)
         self.strip.show()
-        return
 
     def get_strip_info(self):
         return (int(self.desired_brightness), self.get_color())
@@ -176,15 +181,16 @@ class LedStrip:
         else:
             return int(r), int(g), int(b)
 
-    def stop(self):
+    def stop(self, force_stop = False):
+        # Reset color LED setup
+        self.brightness = self.r = self.g = self.b = 0
+        self.update_strip()
         # Stop the thread
         self.running = False
         with self.condition_paused:
             self.condition_paused.notify()
         time.sleep(self.tick_rate)
         self.looper_thread = None
-        # Reset color LED setup
-        self.r = self.g = self.b = self.brightness = 0
 
     def get_status(self):
         return (self.mode.name, 
@@ -201,7 +207,8 @@ class LedStrip:
         self.running = True
         self.looper_thread.start()
         # Init color white
-        self.r = self.g = self.b = 255
+        self.r = self.g = self.b = 0
+        self.r_desired = self.g_desired = self.b_desired = 100
         self.brightness = 0.0
         self.desired_brightness = 0.5
         return self.looper_thread.is_alive()

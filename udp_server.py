@@ -5,7 +5,6 @@ import socket
 import threading
 import re
 import json
-from black import Mode
 import inet_utils as tc
 from log import Log 
 from enum import Enum
@@ -100,6 +99,10 @@ class UdpServer:
             self.processor = ProcessorBc(self.ident, self.tcp_info)
         elif mode == tc.ServerOperationMode.SOUND:
             self.processor = ProcessorStream(self.stream_data_function)
+        elif mode == tc.ServerOperationMode.OFF:
+            self.processor = None
+        elif mode == tc.ServerOperationMode.NORMAL:
+            self.processor = None
         else:
            self.processor = None
         self.print_log('Mode changed to ', mode.name)
