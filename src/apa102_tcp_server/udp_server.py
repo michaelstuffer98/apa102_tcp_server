@@ -4,7 +4,7 @@ import threading
 import re
 import json
 import apa102_tcp_server.inet_utils as tc
-from apa102_tcp_server.log import Log 
+from apa102_tcp_server.log import Log
 from apa102_tcp_server.config_laoder import ConfigLoader
 
 
@@ -15,17 +15,21 @@ class UdpServer:
     # Internet Socket
     udp_socket: socket.socket
     connected_clients = []
-    #Incomming commands
+    # Incomming commands
     message_queue = queue.Queue()
     # Threading helper
     condition_queue = threading.Condition()
     condition_worker = threading.Condition()
     condition_server = threading.Condition()
-    timeout_thread_start = 3.0 # How long the main thread will wait until the called thread notified on its startup in seconds
+
+    # How long the main thread will wait until the called thread notified on its startup in seconds
+    timeout_thread_start = 3.0
+
     server_cancelled: bool = False
     waiting_for_notification = False
 
-    def __init__(self, cl: ConfigLoader, server_mode: tc.ServerOperationMode, stream_data_function, buffer_size: int = 256):
+    def __init__(self, cl: ConfigLoader, server_mode: tc.ServerOperationMode,
+                 stream_data_function, buffer_size: int = 256):
         self.PORT: int = cl['udp.port'],
         self.BUFFER_SIZE = buffer_size
         self.mode = server_mode
@@ -38,7 +42,6 @@ class UdpServer:
         self.stream_data_function = stream_data_function
         self.timeout_start = cl['udp.thread_start_timeout_s']
         self.timeout_close = cl['udp.thread_close_timeout_s']
-    
 
     def start(self) -> bool:
         # Start server listener Thread
@@ -46,19 +49,22 @@ class UdpServer:
         timeout = False
         # Start udp listener thread
         if self.thread_udp is None:
-            self.thread_udp = threading.Thread(target=self.udp_server_thread, name='UDP_'+self.mode.name+'_LISTENER_THREAD')
+            self.thread_udp = threading.Thread(target=self.udp_server_thread,
+                                               name=f'UDP_{self.mode.name}_LISTENER_THREAD')
         if not self.thread_udp.is_alive():
             self.thread_udp.start()
             with self.condition_server:
                 self.waiting_for_notification = True
                 timeout = not self.condition_server.wait(self.timeout_thread_start)
                 self.waiting_for_notification = False
-        if timeout:   #Received no notification
+        # Received no notification:
+        if timeout:
             self.server_cancelled = True
             return False
         # Start command worker thread
         if self.command_worker_thread is None:
-            self.command_worker_thread = threading.Thread(target=self.command_worker, name='udp_'+ self.mode.name +'_worker_thread')
+            self.command_worker_thread = threading.Thread(target=self.command_worker,
+                                                          name=f'udp_{self.mode.name}_worker_thread')
         if not self.command_worker_thread.is_alive():
             self.command_worker_thread.start()
             with self.condition_worker:
@@ -70,15 +76,15 @@ class UdpServer:
             return False
         status = self.status()
         return status[0] and status[1]
-    
+
     def stop(self):
         self.server_cancelled = True
-        if not self.thread_udp is None:
+        if self.thread_udp is not None:
             self.print_log('Waiting for server thread to end')
             self.thread_udp.join(3.0)
             if self.thread_udp.is_alive():
                 self.print_log('Could not stop udp server thread properly!')
-        if not self.command_worker_thread is None:
+        if self.command_worker_thread is not None:
             self.print_log('Waiting for command thread to end')
             # self.message_queue.clear()
             # insert dummy to notify command worker thread
@@ -94,7 +100,7 @@ class UdpServer:
         try:
             return (self.command_worker_thread.is_alive(), self.thread_udp.is_alive())
         except AttributeError:
-            return (not self.command_worker_thread is None, not self.thread_udp is None)
+            return (self.command_worker_thread is not None, self.thread_udp is not None)
 
     def change_mode(self, mode: tc.ServerOperationMode):
         if mode == tc.ServerOperationMode.BC:
@@ -106,7 +112,7 @@ class UdpServer:
         elif mode == tc.ServerOperationMode.NORMAL:
             self.processor = None
         else:
-           self.processor = None
+            self.processor = None
         self.print_log('Mode changed to ', mode.name)
 
     def udp_server_thread(self) -> bool:
@@ -127,9 +133,9 @@ class UdpServer:
                     self.print_log('Return normally from cancelled thread ', threading.current_thread().name)
                     return True
                 continue
-            if bytes != None:
+            if bytes is not None:
                 msg = bytes.decode('utf-8')
-            #with self.condition_queue:
+            # with self.condition_queue:
             self.message_queue.put((msg, address))
             #    self.condition_queue.notify()
 
@@ -147,19 +153,20 @@ class UdpServer:
                 if self.server_cancelled:
                     self.message_queue.queue.clear()
                     return
-                msg, address = message # self.message_queue.pop()
+                msg, address = message      # self.message_queue.pop()
             except IndexError as e:
-                self.print_log('[UDP worker] Error when accessing the command queue: '+ threading.current_thread().ident +': ', e)
+                self.print_log(f'[UDP worker] Error when accessing the command queue: \
+                               {threading.current_thread().ident}: {e}')
                 continue
             ret = None
-            if not self.processor is None:
+            if self.processor is not None:
                 ret = self.processor.process_message(msg)
-            if not ret == None and ret != "":
+            if ret is not None and ret != "":
                 n_bytes = self.udp_socket.sendto(ret.encode('utf-8'), address)
                 self.print_log('[UDP worker] Send ', n_bytes, ' bytes to ', address)
 
     def print_log(self, *args, **kwargs):
-        Log.log('[UPD SERVER '+ self.mode.name +'] ', *args, **kwargs)
+        Log.log('[UPD SERVER ' + self.mode.name + '] ', *args, **kwargs)
 
     @staticmethod
     def recvall(conn, remains):
@@ -177,17 +184,18 @@ class ProcessorBc():
     def __init__(self, ident: str, tcp_info: str):
         self.my_info = json.dumps({'ident': ident, 'port': tcp_info})
 
-    def process_message(self, msg: str)-> str:
+    def process_message(self, msg: str) -> str:
         try:
             m = tc.BroadcastMessages[msg]
-        except KeyError as e:
+        except KeyError:
             return None
         default = "No handler for " + str(m.name)
-        return getattr(self,  "_"+ m.name + '_handler', lambda i: default)()
+        return getattr(self, "_" + m.name + '_handler', lambda i: default)()
 
     # String to be sent back, return None if nothing should be send
-    def _WHERE_IS_PI_handler(self)->str:
+    def _WHERE_IS_PI_handler(self) -> str:
         return self.my_info
+
 
 class ProcessorStream():
     PATTER_COMMAND = re.compile(r'[0-9]{1,3}:[0-9]{1,3}:[0-9]{1,3}')
@@ -199,11 +207,11 @@ class ProcessorStream():
         if not self.PATTER_COMMAND.match(msg):
             return None
         spec = self.parse_spec(msg)
-        if not spec == None:
+        if spec is None:
             self.strip_interface(int(spec[0]))
         return None
 
-    def parse_spec(self, s: str)-> tc.Spectrum:
+    def parse_spec(self, s: str) -> tc.Spectrum:
         values = s.split(':')
         try:
             return tc.Spectrum(values[0], values[1], values[2])

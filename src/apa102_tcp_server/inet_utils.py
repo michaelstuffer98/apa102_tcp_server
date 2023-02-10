@@ -6,16 +6,18 @@ from enum import Enum
 # build the message:
 #   4 digits to specify legth of following message in bytes
 #   message in bytes: cmd_nr:cmd_val
-def make_message(cmd_nr: int, cmd_val: int) -> str:
-    msg = str(cmd_nr) + ':' + str(cmd_val)
-    msg = (str(len(msg))).zfill(4) + msg
-    return msg
+# def make_message(cmd_nr: int, cmd_val: int) -> str:
+#     msg = str(cmd_nr) + ':' + str(cmd_val)
+#     msg = (str(len(msg))).zfill(4) + msg
+#     return msg
+
 
 def make_message(msg: str) -> str:
     if type(msg) != str:
         msg = str(msg)
     msg = (str(len(msg))).zfill(4) + msg
     return msg
+
 
 class Client:
     id_static: int = 0
@@ -27,7 +29,7 @@ class Client:
         self.id_static = self.id_static + 1
         self.client_socket = client_socket
 
-    def send_message(self, server_socket, msg: str):
+    def send_message(self, msg: str):
         msg = make_message(msg)
         try:
             self.client_socket.send(msg.encode('utf-8'))
@@ -45,6 +47,7 @@ class Client:
     def print_log(self, *args, **kwargs):
         Log.log('[Client ' + str(self.client_id) + '] ', *args, **kwargs)
 
+
 # TCP command container with the client, who sent the command
 class Command:
     def __init__(self, cmd, val, connection: Client):
@@ -52,7 +55,8 @@ class Command:
         self.value = val
         self.connection = connection
 
-# Available commands that can be send via TCP 
+
+# Available commands that can be send via TCP
 # with the specified integer-key
 class TcpCommandType(Enum):
     START = 1
@@ -67,9 +71,11 @@ class TcpCommandType(Enum):
     MODE = 10
     MESSAGE = 11
 
+
 class TcpMessageTypes(Enum):
     CONNECTION_ACCEPTED = 1
     CONNECTION_DENIED = 2
+
 
 class ServerOperationMode(Enum):
     OFF = 0
@@ -77,8 +83,10 @@ class ServerOperationMode(Enum):
     SOUND = 2
     BC = 3
 
+
 class BroadcastMessages(Enum):
     WHERE_IS_PI = 1
+
 
 class Spectrum():
     bass: int
@@ -98,6 +106,7 @@ class Spectrum():
         self.bass = bass
         self.mid = mid
         self.treb = treb
+
 
 class ServerState(Enum):
     CONNECTED = 1,

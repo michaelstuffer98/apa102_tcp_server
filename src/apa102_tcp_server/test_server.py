@@ -5,8 +5,10 @@ from apa102_tcp_server.inet_utils import TcpCommandType as CMD
 
 cancelled: bool = False
 
-def get_color_from_rgb(r, g, b)->int:
+
+def get_color_from_rgb(r, g, b) -> int:
     return int(r) + (int(g) << 8) + (int(b) << 16)
+
 
 def receiver(con: socket.socket):
     con.setblocking(0)
@@ -24,7 +26,7 @@ def receiver(con: socket.socket):
                 print('Connection is lost')
                 return
             print('Answer: ', a, '\n')
-        except socket.timeout as e:
+        except socket.timeout:
             continue
         except Exception as e:
             print('Terminate receiver thread: ', e)
@@ -40,7 +42,7 @@ try:
 
     rcvThread = threading.Thread(target=receiver, args=(client,))
     rcvThread.start()
-    
+
     if client.fileno() == -1:
         print("fileno failed")
         exit(1)
@@ -52,9 +54,9 @@ try:
     msg = (str(len(msg))).zfill(4) + msg
     print('Send ', msg)
     client.send(msg.encode('utf-8'))
-    
+
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        
+
     while 1:
         input('Press Enter to send Spectrum')
         MESSAGE = b"100:234:345"
@@ -73,7 +75,7 @@ try:
     msg = (str(len(msg))).zfill(4) + msg
     print('Send ', msg)
     client.send(msg.encode('utf-8'))
-    
+
     input('Start...')
 
     cmd_nr = CMD.INTENSITY.value
@@ -121,31 +123,30 @@ try:
     input('Exit...')
 
     cancelled = True
-    
-    #print('Send valid')
-    #client.send('000510:04'.encode('utf-8'))
-    #time.sleep(1)
+
+    # print('Send valid')
+    # client.send('000510:04'.encode('utf-8'))
+    # time.sleep(1)
     #
-    #print('Send invalid pattern')
-    #client.send('000555:-1'.encode('utf-8'))
-    #time.sleep(1)
+    # print('Send invalid pattern')
+    # client.send('000555:-1'.encode('utf-8'))
+    # time.sleep(1)
     #
-    #print('Send invalid pattern')
-    #client.send('0005-7:98'.encode('utf-8'))
-    #time.sleep(1)
+    # print('Send invalid pattern')
+    # client.send('0005-7:98'.encode('utf-8'))
+    # time.sleep(1)
     #
-    #print('Send invalid command number')
-    #client.send('000534:12'.encode('utf-8'))
-    #time.sleep(1)
+    # print('Send invalid command number')
+    # client.send('000534:12'.encode('utf-8'))
+    # time.sleep(1)
     #
-    #print('Send termination command number')
-    #client.send('00039:0'.encode('utf-8'))
-    #time.sleep(1)
+    # print('Send termination command number')
+    # client.send('00039:0'.encode('utf-8'))
+    # time.sleep(1)
 
     rcvThread.join()
 
     print('Terminate execution properly')
 
 except ConnectionResetError as e:
-    print('Connection has been closed by Server')
-
+    print('Connection has been closed by Server: ', e)

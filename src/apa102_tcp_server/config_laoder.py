@@ -8,7 +8,6 @@ class ConfigLoader:
         with open(file_path, 'r') as c_file:
             self.config = yaml.load(c_file, FullLoader)
 
-
     def get_key(self, keys: str, separator='.'):
         """
         returns a from the config file
@@ -21,7 +20,6 @@ class ConfigLoader:
             value = value[key]
 
         return value
-
 
     def __getitem__(self, key):
         return self.get_key(key)

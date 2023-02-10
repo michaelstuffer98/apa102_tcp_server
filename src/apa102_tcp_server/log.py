@@ -1,6 +1,7 @@
 import builtins as __builtin__
 import queue
 
+
 class Log:
     # TODO make print thread save!
     print_queue = queue.Queue()
@@ -11,4 +12,3 @@ class Log:
     @staticmethod
     def log(name: str, *args, **kwargs):
         __builtin__.print(name, *args, **kwargs)
-

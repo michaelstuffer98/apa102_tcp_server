@@ -6,7 +6,6 @@ import apa102_tcp_server.tcp_server as Tcp
 import apa102_tcp_server.udp_server as Udp
 from apa102_tcp_server.log import Log
 import apa102_tcp_server.inet_utils as tc
-from apa102_tcp_server.log import Log
 import json
 from apa102_tcp_server.config_laoder import ConfigLoader
 from os import path
@@ -19,16 +18,17 @@ class Controller:
         cl = ConfigLoader(path.join('./data', config_name))
 
         self.new_command_received = threading.Condition()
-        
+
         # setup and initialize LED Strip
         self.led_strip = LedStrip(cl)
 
         self.tcp_server = Tcp.TcpServer(cl, self.new_command_received)
-        self.udp_server = Udp.UdpServer(cl, server_mode=tc.ServerOperationMode.BC, stream_data_function=self.led_strip.set_intensity)
+        self.udp_server = Udp.UdpServer(cl, server_mode=tc.ServerOperationMode.BC,
+                                        stream_data_function=self.led_strip.set_intensity)
 
         self.command_thread = threading.Thread(target=self.command_worker)
         self.cmd_switch = CmdSwitch(self)
-        self.state : tc.ServerState = tc.ServerState.CLOSED
+        self.state: tc.ServerState = tc.ServerState.CLOSED
 
     def start(self):
         self.print_log('Invoke controler start')
@@ -68,9 +68,9 @@ class Controller:
                     continue
                 # Execute cmd here
                 cmd_type, ret = self.cmd_switch.switch(c)
-                if not ret is None and not ret == "":
+                if ret is not None and not ret == "":
                     self.tcp_server.send_answer(c.connection, json.dumps({'type': cmd_type, 'message': ret}))
-                elif not ret is None and ret == "":
+                elif ret is not None and ret == "":
                     self.tcp_server.send_answer(c.connection, 'Unresolved command nr')
                 else:
                     self.print_log("Closed connection....")
@@ -83,9 +83,9 @@ class Controller:
 
 
 class CmdSwitch:
-    def __init__(self, controller : Controller) -> None:
+    def __init__(self, controller: Controller) -> None:
         self.controller = controller
-        self.command : Tcp.Command = None
+        self.command: Tcp.Command = None
 
     def switch(self, command):
         self.command = command
@@ -93,7 +93,7 @@ class CmdSwitch:
         default = "Could not resolve command number " + str(command.command)
         try:
             t = tc.TcpCommandType(command.command).name
-            return (t, getattr(self,  "_"+ t, lambda i: default)(command.value))
+            return (t, getattr(self, "_" + t, lambda i: default)(command.value))
         except ValueError:
             return ""
 
@@ -112,15 +112,15 @@ class CmdSwitch:
         self.controller.udp_server.change_mode(tc.ServerOperationMode.NORMAL)
         s = self.controller.led_strip.get_status()
         return json.dumps({'port': self.controller.udp_server.PORT, 'state': s[0], 'brightness': s[1], 'color': s[2]})
-        
+
     def _STOP(self, value: int):
         self.controller.udp_server.change_mode(tc.ServerOperationMode.OFF)
         self.controller.led_strip.stop()
         return "Strip operation stopped"
-    
+
     def _SET_COLOR(self, value: int):
         self.controller.led_strip.set_color(value)
-        return "color set to " + str(value)    
+        return "color set to " + str(value)
 
     def _SET_BRIGHTNESS(self, value: int):
         self.controller.led_strip.set_brightness(value)
@@ -133,7 +133,7 @@ class CmdSwitch:
     def _OPERATION_MODE(self, value: int):
         try:
             mode = tc.ServerOperationMode(value)
-        except ValueError as e:
+        except ValueError:
             return 'Invalid operation mode ' + str(value)
         self.controller.udp_server.change_mode(mode)
         self.controller.led_strip.change_mode(mode)
@@ -151,7 +151,8 @@ class CmdSwitch:
     def print_log(*args, **kwargs):
         Log.log('[CONTROLLER] ', *args, **kwargs)
 
-if __name__=='__main__':
+
+if __name__ == '__main__':
     # Start routine
     controller = Controller(config_name='config.yaml')
     controller.start()

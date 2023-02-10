@@ -25,7 +25,6 @@ class LedStrip:
     mode: Mode = Mode.NORMAL
     looper_thread = threading.Thread
 
-
     def __init__(self, cl: ConfigLoader):
         # stripe setup
         self.strip = apa102.APA102(num_led=cl['strip.num_led'], mosi=cl['strip.mosi'],
@@ -37,7 +36,7 @@ class LedStrip:
         # Update-Thread variables
         self.read_table_file('./data/table_peak')
         self.paused = False
-        self.condition_paused = threading.Condition()#
+        self.condition_paused = threading.Condition()
         self.r_desired = 100
         self.g_desired = 100
         self.b_desired = 100
@@ -52,7 +51,6 @@ class LedStrip:
         # initial values
         self.initial_brightness = cl['visual.initial_brightness']
         self.initial_color = cl['visual.initial_color']
-
 
     # Worker thread at fixed time interval (synchronous), allows interpolation
     def loop(self):
@@ -73,8 +71,8 @@ class LedStrip:
             if counter == 0:
                 print('[LED STRIPE] WARNING: tick rate is too fast!')
                 if self.mode == Mode.SOUND:
-                    self.peak_step_size = self.peak_step_size + 1 
-                    print('[LED STRIPE] ==> Increased step size (', self.peak_step_size,')')
+                    self.peak_step_size = self.peak_step_size + 1
+                    print('[LED STRIPE] ==> Increased step size (', self.peak_step_size, ')')
                 if self.mode == Mode.NORMAL:
                     # TODO handle too fast loop speed
                     pass
@@ -93,7 +91,6 @@ class LedStrip:
             with self.condition_paused:
                 self.condition_paused.notify()
 
-
     # Linear interpolation between desired and current value
     def interpolate_brightness(self) -> bool:
         # Avoid toggeling at the end of interpolation
@@ -109,20 +106,20 @@ class LedStrip:
 
     # Linear interpolation between desired and current value
     def interpolate_rgb_color(self) -> bool:
-        dif_r = self.r_desired-self.r
-        dif_g = self.g_desired-self.g
-        dif_b = self.b_desired-self.b
+        dif_r = self.r_desired - self.r
+        dif_g = self.g_desired - self.g
+        dif_b = self.b_desired - self.b
         if dif_r <= self.color_equal_th and dif_g <= self.color_equal_th and dif_b <= self.color_equal_th:
-            # Goto loop pause mode 
+            # Goto loop pause mode
             self.r = self.r_desired
             self.g = self.g_desired
             self.b = self.b_desired
             return False
-        self.r = (dif_r)*self.color_interpolation_speed + self.r
-        self.g = (dif_g)*self.color_interpolation_speed + self.g
-        self.b = (dif_b)*self.color_interpolation_speed + self.b
+        self.r = (dif_r) * self.color_interpolation_speed + self.r
+        self.g = (dif_g) * self.color_interpolation_speed + self.g
+        self.b = (dif_b) * self.color_interpolation_speed + self.b
         return True
-        
+
     def set_brightness(self, b: int):
         self.desired_brightness = (b / 100.0)
         with self.condition_paused:
@@ -150,30 +147,30 @@ class LedStrip:
 
     def update_strip(self):
         color = self.get_scaled_color_from_rgb(self.r, self.g, self.b)
-        for i in range(1, self.strip.num_led+1):
+        for i in range(1, self.strip.num_led + 1):
             self.strip.set_pixel_rgb(i, color)
         self.strip.show()
 
     def get_strip_info(self):
         return (int(self.desired_brightness), self.get_color())
-        
+
     def get_color(self, scaled: bool = False) -> int:
         r = self.r
         g = self.g
         b = self.b
         if scaled:
-            r = r*self.brightness
-            g = g*self.brightness
-            b = b*self.brightness
+            r = r * self.brightness
+            g = g * self.brightness
+            b = b * self.brightness
         return int(r) + (int(g) << 8) + (int(b) << 16)
 
     # Convert R, G, B, to a single color Integer value
     # Set scaled=True to apply brightness multiplicator
-    def get_scaled_color_from_rgb(self, r, g, b, scaled: bool = True)->int:
+    def get_scaled_color_from_rgb(self, r, g, b, scaled: bool = True) -> int:
         if scaled:
-            r = r*self.brightness
-            g = g*self.brightness
-            b = b*self.brightness
+            r = r * self.brightness
+            g = g * self.brightness
+            b = b * self.brightness
         return int(r) + (int(g) << 8) + (int(b) << 16)
 
     # Use scaled property to apply brightness multiplicator
@@ -185,11 +182,11 @@ class LedStrip:
         g = (color & 0xFF00) >> 8
         b = (color & 0xFF0000) >> 16
         if scaled:
-            return int(r/self.brightness), int(g/self.brightness), int(b/self.brightness)
+            return int(r / self.brightness), int(g / self.brightness), int(b / self.brightness)
         else:
             return int(r), int(g), int(b)
 
-    def stop(self, force_stop = False):
+    def stop(self, force_stop=False):
         # Reset color LED setup
         self.brightness = self.r = self.g = self.b = 0
         self.update_strip()
@@ -201,8 +198,8 @@ class LedStrip:
         self.looper_thread = None
 
     def get_status(self):
-        return (self.mode.name, 
-                (self.desired_brightness*100),
+        return (self.mode.name,
+                (self.desired_brightness * 100),
                 self.get_color())
 
     def start(self) -> bool:

@@ -22,9 +22,10 @@ class TcpServer:
     # thread_tcp: threading.Thread
 
     connected_clients = []
-    #Incomming commands
+    # Incomming commands
 
-    def __init__(self, cl: ConfigLoader, condition_var: threading.Condition, buffer_size: int = 1024, max_clients: int = 1) -> None:
+    def __init__(self, cl: ConfigLoader, condition_var: threading.Condition,
+                 buffer_size: int = 1024, max_clients: int = 1) -> None:
         self.PORT = cl['tcp.port']
         self.BUFFER_SIZE = buffer_size
         # Internet Socket
@@ -38,7 +39,6 @@ class TcpServer:
         self.command_queue = queue.Queue()
         self.thread_locker = threading.Lock()
         self.stop_timeout = cl['tcp.thread_close_timeout_s']
-
 
     def start(self, controller: Controller) -> None:
         # start listener thread
@@ -90,27 +90,31 @@ class TcpServer:
             except socket.timeout:
                 continue
             except OSError as e:
-                self.print_log('listener thread: ' , e)
+                self.print_log('listener thread: ', e)
                 return 1
-            
+
             self.print_log('New connection request from ' + client_address[0] + ':' + str(client_address[1]))
             # Close connection, if maximum number of clients are already connected
             if len(self.connected_clients) >= self.MAX_CLIENTS:
-                client.send_message(self.socket, "REFUSED")
+                client = Client(client_address[0], client_address[1], client_socket)
+                client.send_message("REFUSED")
                 client_socket.close()
-                self.print_log('Connection refused: ' + client_address[0] + ':' + str(client_address[1]) + ', because no more clients can connect.')
+                self.print_log(f'Connection refused: {client_address[0]}: {str(client_address[1])}\
+                               because no more clients can connect.')
                 continue
+
             self.controller.state = ServerState.CONNECTED
 
             # Register Client:
             client = Client(client_address[0], client_address[1], client_socket)
             self.connected_clients.append(client)
-            self.print_log('Connection accepted (', len(self.connected_clients),' total connections): ' + client_address[0] + ':' + str(client_address[1]))
-            client.send_message(self.socket, json.dumps({'type': TcpMessageTypes.CONNECTION_ACCEPTED.name, 'message': '0'}))
+            self.print_log(f'Connection accepted ({len(self.connected_clients)} total connections):\
+                            {client_address[0]}: {str(client_address[1])}')
+            client.send_message(json.dumps({'type': TcpMessageTypes.CONNECTION_ACCEPTED.name, 'message': '0'}))
             # Start the client routine
             try:
                 handler_thread = threading.Thread(target=self.client_routine, name=('Client_' + str(client.client_id)),
-                                                 args=(client,))
+                                                  args=(client,))
                 handler_thread.start()
             except Exception as e:
                 self.print_log("Error in Client Thread (", client.client_id, ")")
@@ -139,9 +143,9 @@ class TcpServer:
             cmd_nr, cmd_val = self.parse_command(self, data_rec)
             if cmd_nr is None or cmd_val is None:
                 self.print_log('Invalid Command Signature (pattern)')
-                client.send_message(self.socket, 'Invalid Command Pattern')
+                client.send_message('Invalid Command Pattern')
                 continue
-            self.print_log("Client [", client.client_id, "]: CMD ", cmd_nr, '(',cmd_val, ')')
+            self.print_log("Client [", client.client_id, "]: CMD ", cmd_nr, '(', cmd_val, ')')
             try:
                 self.notificator_commands.acquire()
                 self.command_queue.put(Command(cmd_nr, cmd_val, client))
@@ -159,7 +163,7 @@ class TcpServer:
                 print('[Client ', threading.get_ident(), '] Remote connection closed by remote device')
                 return
             except ConnectionAbortedError:
-                print('[Client ', threading.get_ident(),'] Remote connection aborted')
+                print('[Client ', threading.get_ident(), '] Remote connection aborted')
                 return
             except OSError:
                 print('[Client ', threading.get_ident(), '] Connection down')
@@ -177,19 +181,15 @@ class TcpServer:
         cmd = cmd.split(sep=":")
         return [int(cmd[0]), int(cmd[1])]
 
-    def send_answer(self, client: Client, msg: int):
-        client.send_message(self.socket, str(msg))
-        return
-
     def send_answer(self, client: Client, msg: str):
-        client.send_message(self.socket, msg)
+        client.send_message(str(msg))
         return
 
     def close_client_connection(self, client_id: int):
         for c in self.connected_clients:
             if isinstance(c, Client) and c.client_id == client_id:
                 c.close()
-                self.print_log('Terminated TCP connection of client [', client_id,']: ' + c.ip + ':' + str(c.port))
+                self.print_log('Terminated TCP connection of client [', client_id, ']: ' + c.ip + ':' + str(c.port))
                 self.connected_clients.remove(c)
                 if len(self.connected_clients) == 0:
                     self.controller.state = ServerState.OPEN
