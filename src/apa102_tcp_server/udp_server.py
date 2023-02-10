@@ -26,18 +26,18 @@ class UdpServer:
     waiting_for_notification = False
 
     def __init__(self, cl: ConfigLoader, server_mode: tc.ServerOperationMode, stream_data_function, buffer_size: int = 256):
-        self.PORT: int = cl.get_key('udp.port'),
+        self.PORT: int = cl['udp.port'],
         self.BUFFER_SIZE = buffer_size
         self.mode = server_mode
         # Listener Thread
         self.thread_udp: threading.Thread = None
         self.command_worker_thread: threading.Thread = None
-        self.ident = cl.get_key('udp.server_ident'),
-        self.tcp_info = cl.get_key('tcp.port'),
+        self.ident = cl['udp.server_ident'],
+        self.tcp_info = cl['tcp.port'],
         self.processor = ProcessorBc(self.server_ident, self.tcp_info)
         self.stream_data_function = stream_data_function
-        self.timeout_start = cl.get_key('udp.thread_start_timeout_s')
-        self.timeout_close = cl.get_key('udp.thread_close_timeout_s')
+        self.timeout_start = cl['udp.thread_start_timeout_s']
+        self.timeout_close = cl['udp.thread_close_timeout_s']
     
 
     def start(self) -> bool:

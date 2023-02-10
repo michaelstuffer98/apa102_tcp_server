@@ -25,7 +25,7 @@ class TcpServer:
     #Incomming commands
 
     def __init__(self, cl: ConfigLoader, condition_var: threading.Condition, buffer_size: int = 1024, max_clients: int = 1) -> None:
-        self.PORT = cl.get_key('tcp.port')
+        self.PORT = cl['tcp.port']
         self.BUFFER_SIZE = buffer_size
         # Internet Socket
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -37,7 +37,7 @@ class TcpServer:
         self.notificator_commands = condition_var
         self.command_queue = queue.Queue()
         self.thread_locker = threading.Lock()
-        self.stop_timeout = cl.get_key('tcp.thread_close_timeout_s')
+        self.stop_timeout = cl['tcp.thread_close_timeout_s']
 
 
     def start(self, controller: Controller) -> None:

@@ -28,12 +28,12 @@ class LedStrip:
 
     def __init__(self, cl: ConfigLoader):
         # stripe setup
-        self.strip = apa102.APA102(num_led=cl.get_key('strip.num_led'), mosi=cl.get_key('strip.mosi'),
-                                   sclk=cl.get_key('strip.sclk'), order=cl.get_key('strip.color_order'))
+        self.strip = apa102.APA102(num_led=cl['strip.num_led'], mosi=cl['strip.mosi'],
+                                   sclk=cl['strip.sclk'], order=cl['strip.color_order'])
         self.strip.set_global_brightness(31)
         self.strip.clear_strip()
         # passed to constructor, stored in seconds
-        self.tick_rate: float = cl.get_key('visual.tick_rate_ms') / 1000
+        self.tick_rate: float = cl['visual.tick_rate_ms'] / 1000
         # Update-Thread variables
         self.read_table_file('./data/table_peak')
         self.paused = False
@@ -43,15 +43,15 @@ class LedStrip:
         self.b_desired = 100
 
         # interpolation step-size in each loop of duration 'tick-rate'
-        self.color_interpolation_speed: float = cl.get_key('visual.color_interpolation_speed')
-        self.brightness_interpolation_speed: float = cl.get_key('visual.brightness_interpolation_speed')
-        self.color_equal_th: float = cl.get_key('visual.color_equal_threshold')
+        self.color_interpolation_speed: float = cl['visual.color_interpolation_speed']
+        self.brightness_interpolation_speed: float = cl['visual.brightness_interpolation_speed']
+        self.color_equal_th: float = cl['visual.color_equal_threshold']
         # peak
-        self.peak_step_size: int = cl.get_key('visual.peak_step_size')
-        self.min_intensity_sound: float = cl.get_key('visual.min_intensity_sound')
+        self.peak_step_size: int = cl['visual.peak_step_size']
+        self.min_intensity_sound: float = cl['visual.min_intensity_sound']
         # initial values
-        self.initial_brightness = cl.get_key('visual.initial_brightness')
-        self.initial_color = cl.get_key('visual.initial_color')
+        self.initial_brightness = cl['visual.initial_brightness']
+        self.initial_color = cl['visual.initial_color']
 
 
     # Worker thread at fixed time interval (synchronous), allows interpolation
