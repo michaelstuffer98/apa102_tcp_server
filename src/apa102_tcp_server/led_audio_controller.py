@@ -1,5 +1,4 @@
 #!/usr/bin/python
-
 import threading
 from apa102_tcp_server.apa_led import LedStrip
 import apa102_tcp_server.tcp_server as Tcp
@@ -8,14 +7,13 @@ from apa102_tcp_server.log import Log
 import apa102_tcp_server.inet_utils as tc
 import json
 from apa102_tcp_server.config_laoder import ConfigLoader
-from os import path
 
 
 # General controlling unit, handles and delegates all basic program work-flow
 class Controller:
 
-    def __init__(self, config_name):
-        cl = ConfigLoader(path.join('./data', config_name))
+    def __init__(self, config_path):
+        cl = ConfigLoader(config_path)
 
         self.new_command_received = threading.Condition()
 
@@ -152,9 +150,9 @@ class CmdSwitch:
         Log.log('[CONTROLLER] ', *args, **kwargs)
 
 
-if __name__ == '__main__':
+def main(args):
     # Start routine
-    controller = Controller(config_name='config.yaml')
+    controller = Controller(config_path=args.config)
     controller.start()
     while 1:
         key = input('')
