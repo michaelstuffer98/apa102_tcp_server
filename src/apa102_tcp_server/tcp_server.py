@@ -3,9 +3,9 @@ import queue
 import socket
 import threading
 import re
-from log import Log
-from led_audio_controller import Controller
-from inet_utils import Client, ServerOperationMode, Command, ServerState, TcpMessageTypes
+from apa102_tcp_server.log import Log
+from apa102_tcp_server.led_audio_controller import Controller
+from apa102_tcp_server.inet_utils import Client, ServerOperationMode, Command, ServerState, TcpMessageTypes
 
 class TcpServer:
     # Constants

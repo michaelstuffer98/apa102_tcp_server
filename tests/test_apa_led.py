@@ -1,4 +1,4 @@
-import apa_led
+import apa102_tcp_server.apa_led as apa_led
 
 
 def test_interpolation():

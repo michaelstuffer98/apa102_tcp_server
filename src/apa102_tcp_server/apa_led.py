@@ -1,9 +1,8 @@
-#!/usr/bin/env python3
-import json
 from apa102_pi.driver import apa102
 import time
 import threading
-from inet_utils import ServerOperationMode as Mode
+from apa102_tcp_server.inet_utils import ServerOperationMode as Mode
+
 
 class LedStrip:
     # color

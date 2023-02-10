@@ -1,13 +1,12 @@
 #!/usr/bin/python
 
 import threading
-from apa_led import LedStrip
-import tcp_server as Tcp
-import udp_server as Udp
-from log import Log
-from enum import Enum
-import inet_utils as tc
-from log import Log
+from apa102_tcp_server.apa_led import LedStrip
+import apa102_tcp_server.tcp_server as Tcp
+import apa102_tcp_server.udp_server as Udp
+from apa102_tcp_server.log import Log
+import apa102_tcp_server.inet_utils as tc
+from apa102_tcp_server.log import Log
 import json
 
 # General controlling unit, handles and delegates all basic program work-flow

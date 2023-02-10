@@ -1,13 +1,11 @@
-from lzma import MODE_NORMAL
-from platform import processor
 import queue
 import socket
 import threading
 import re
 import json
-import inet_utils as tc
-from log import Log 
-from enum import Enum
+import apa102_tcp_server.inet_utils as tc
+from apa102_tcp_server.log import Log 
+
 
 class UdpServer:
     # Constants

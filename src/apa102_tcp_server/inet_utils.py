@@ -1,7 +1,6 @@
-from log import Log
+from apa102_tcp_server.log import Log
 import socket
 from enum import Enum
-import inet_utils as utils
 ### Port declarations ###
 
 #   broadcast of rpi ip address and streaming data
@@ -34,7 +33,7 @@ class Client:
         self.client_socket = client_socket
 
     def send_message(self, server_socket, msg: str):
-        msg = utils.make_message(msg)
+        msg = make_message(msg)
         try:
             self.client_socket.send(msg.encode('utf-8'))
             self.print_log('==>SEND: \'', msg[4:len(msg):1], '\' to ', self.ip, ':', str(self.port))
