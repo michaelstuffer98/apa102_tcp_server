@@ -277,4 +277,3 @@ class LedStrip:
     def __str__(self) -> str:
         status = self.get_status()
         return f"Mode: {status['mode']}, Brightness: {status['brightness']}, Color RGB: {status['color']}"
-

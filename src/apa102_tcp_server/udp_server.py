@@ -8,7 +8,6 @@ from typing import Callable
 
 import apa102_tcp_server.inet_utils as tc
 from apa102_tcp_server.config_laoder import ConfigLoader
-from apa102_tcp_server.log import Log
 
 
 class UdpServer:
@@ -135,7 +134,8 @@ class UdpServer:
                 bytes, address = self.udp_socket.recvfrom(self.BUFFER_SIZE)
             except socket.timeout:
                 if self.server_cancelled:
-                    self.log.info(f'Terminate Udp thread after receiving cancel signal {threading.current_thread().name}')
+                    self.log.info(f'Terminate Udp thread after receiving \
+                                  cancel signal {threading.current_thread().name}')
                     return True
                 continue
             if bytes is not None:

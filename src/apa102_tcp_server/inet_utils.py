@@ -35,7 +35,7 @@ class Client:
         try:
             self.client_socket.send(msg.encode('utf-8'))
             self.log.info(f"Sent '{msg[4:len(msg):1]}' to {self.ip}:{self.port}")
-        except OSError as e:
+        except OSError:
             self.log.exception(f"Failed sending '{msg[4:len(msg):1]}' to {self.ip}:{self.port}")
             return False
         return True

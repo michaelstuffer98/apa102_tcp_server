@@ -10,7 +10,6 @@ from apa102_tcp_server.config_laoder import ConfigLoader
 from apa102_tcp_server.inet_utils import (Client, Command, ServerOperationMode,
                                           ServerState, TcpMessageTypes)
 from apa102_tcp_server.led_audio_controller import Controller
-from apa102_tcp_server.log import Log
 
 
 class TcpServer:
@@ -91,13 +90,13 @@ class TcpServer:
             # Incoming connection
             try:
                 if self.server_terminated:
-                    self.log.info(f'Incomming connection listener stops because server has been terminated')
+                    self.log.info('Incomming connection listener stops because server has been terminated')
                     return 0
                 client_socket, client_address = self.socket.accept()
             except socket.timeout:
                 continue
-            except OSError as e:
-                self.log.exception(f'Listener thread received an error while accepting incomming connection!')
+            except OSError:
+                self.log.exception('Listener thread received an error while accepting incomming connection!')
                 return 2
 
             self.log.info(f'New connection request from {client_address[0]}: {client_address[1]}')
@@ -123,7 +122,7 @@ class TcpServer:
                 handler_thread = threading.Thread(target=self.client_routine, name=('Client_' + str(client.client_id)),
                                                   args=(client,))
                 handler_thread.start()
-            except Exception as e:
+            except Exception:
                 self.log.exception(f"Error in Client Thread ({client.client_id})")
                 self.close_client_connection(client.client_id)
                 self.controller.state = ServerState.CLOSED
@@ -208,7 +207,7 @@ class TcpServer:
         for c in self.connected_clients:
             if isinstance(c, Client):
                 c.close()
-                self.connected_clients.remove(s)
+                self.connected_clients.remove(c)
                 self.log.info(f'   Terminated TCP connection at {c.ip}')
                 counter = counter + 1
         return counter
