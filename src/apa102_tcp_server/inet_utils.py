@@ -1,6 +1,6 @@
-from apa102_tcp_server.log import Log
 import socket
 from enum import Enum
+import logging
 
 
 # build the message:
@@ -29,13 +29,15 @@ class Client:
         self.id_static = self.id_static + 1
         self.client_socket = client_socket
 
+        self.log = logging.getLogger(f'CLIENT_{self.ip}')
+
     def send_message(self, msg: str) -> bool:
         msg = make_message(msg)
         try:
             self.client_socket.send(msg.encode('utf-8'))
-            self.print_log('==>SEND: \'', msg[4:len(msg):1], '\' to ', self.ip, ':', str(self.port))
+            self.log.info(f"Sent '{msg[4:len(msg):1]}' to {self.ip}:{self.port}")
         except OSError as e:
-            self.print_log('Can\'t send message to ' + self.ip + ':' + str(self.port), ' -> ', e)
+            self.log.exception(f"Failed sending '{msg[4:len(msg):1]}' to {self.ip}:{self.port}")
             return False
         return True
 
@@ -47,9 +49,6 @@ class Client:
             self.print_log('Error while closing client socket: ', e)
             return False
         return True
-
-    def print_log(self, *args, **kwargs):
-        Log.log('[Client ' + str(self.client_id) + '] ', *args, **kwargs)
 
 
 # TCP command container with the client, who sent the command

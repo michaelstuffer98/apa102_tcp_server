@@ -7,6 +7,7 @@ import apa102_tcp_server.udp_server as Udp
 from apa102_tcp_server.log import Log
 import apa102_tcp_server.inet_utils as tc
 import json
+import logging
 from apa102_tcp_server.config_laoder import ConfigLoader
 from os import PathLike
 from typing import Callable
@@ -29,11 +30,13 @@ class Controller:
                                         stream_data_function=self.led_strip.set_intensity)
 
         self.command_thread = threading.Thread(target=self.command_worker)
-        self.cmd_switch = CmdSwitch(self)
+        self.cmd_switch = CmdSwitch(self, self.log)
         self.state: tc.ServerState = tc.ServerState.CLOSED
 
+        self.log = logging.getLogger('CONTROLLER')
+
     def start(self) -> bool:
-        self.print_log('Invoke controler start')
+        self.log.info('Invoke startup')
         self.tcp_server.start(self)
         # Start the internet server threads
         self.command_thread.start()
@@ -41,7 +44,7 @@ class Controller:
 
     def stop(self) -> None:
         # Invoke tcp server stop
-        self.print_log('Invoke controler stop')
+        self.log.info('Invoke stop')
         # Insert dummy termination command to worker queue
         self.tcp_server.stop()
         self.tcp_server.invoke_queue_termination()
@@ -49,8 +52,9 @@ class Controller:
         self.udp_server.stop()
         self.state = tc.ServerState.CLOSED
 
-    def print_server_state(self) -> None:
-        self.print_log('SERVER STATE: ', self.state)
+    def log_controller_state(self) -> None:
+        self.log.debug(f'Server state: {str(self)}')
+        self.log.debug(f'Strip: {str(self.led_strip)}')
 
     def command_worker(self) -> bool:
         while 1:
@@ -58,7 +62,7 @@ class Controller:
             if c:
                 # Termination command, enqueued artificially by server-stop routine
                 if c.command == -1 and c.value == -1:
-                    self.print_log('Terminate CMD-Worker Thread')
+                    self.log.info('Terminate command-worker thread')
                     return True
                 found = False
                 for client in self.tcp_server.connected_clients:
@@ -66,28 +70,30 @@ class Controller:
                         found = True
                         break
                 if not found:
-                    self.print_log('Command from unregistered client. Skip command...')
+                    self.log.warning(f'Skip command from unregistered client {client.ip}')
                     continue
                 # Execute cmd here
                 cmd_type, ret = self.cmd_switch.switch(c)
                 if ret is not None and not ret == "":
                     self.tcp_server.send_answer(c.connection, json.dumps({'type': cmd_type, 'message': ret}))
                 elif ret is not None and ret == "":
+                    self.log.error(f'Could not resolve cmd {c.command} from {client.ip}')
                     self.tcp_server.send_answer(c.connection, 'Unresolved command nr')
                 else:
-                    self.print_log("Closed connection....")
+                    self.log.info(f"Closed connection at {client.ip}")
             else:
                 return False
 
-    @staticmethod
-    def print_log(*args, **kwargs):
-        Log.log('[CONTROLLER] ', *args, **kwargs)
+    def __str__(self) -> str:
+        return f"Mode: {self.state}"
 
 
 class CmdSwitch:
-    def __init__(self, controller: Controller) -> None:
+    def __init__(self, controller: Controller, logger) -> None:
         self.controller = controller
         self.command: Tcp.Command = None
+
+        self.log = logger
 
     def switch(self, command) -> str | tuple[tc.TcpCommandType, Callable[[CmdSwitch, int], str]]:
         self.command = command
@@ -108,7 +114,7 @@ class CmdSwitch:
 
     def _START(self, value: int) -> str:
         if not self.controller.led_strip.start():
-            self.print_log("ERROR occured during LED stripe initialization!")
+            self.log.error("ERROR occured during LED stripe initialization!")
             return json.dumps({'error': 'LED setup failed!'})
         # Return UDP Port
         self.controller.udp_server.change_mode(tc.ServerOperationMode.NORMAL)
@@ -149,10 +155,6 @@ class CmdSwitch:
         self.controller.led_strip.set_intensity(value)
         return "Intensity set to " + str(value)
 
-    @staticmethod
-    def print_log(*args, **kwargs):
-        Log.log('[CONTROLLER] ', *args, **kwargs)
-
 
 def main(args: Namespace) -> None:
     # Start routine
@@ -161,7 +163,7 @@ def main(args: Namespace) -> None:
     while 1:
         key = input('')
         if key == 'i':
-            controller.led_strip.print_status()
+            controller.log_controller_state()
         else:
             break
     controller.stop()

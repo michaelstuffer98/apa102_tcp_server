@@ -4,6 +4,7 @@ import threading
 import re
 import json
 from typing import Callable
+import logging
 import apa102_tcp_server.inet_utils as tc
 from apa102_tcp_server.log import Log
 from apa102_tcp_server.config_laoder import ConfigLoader
@@ -43,6 +44,9 @@ class UdpServer:
         self.stream_data_function: Callable[[int], None] = stream_data_function
         self.timeout_start: float = cl['udp.thread_start_timeout_s']
         self.timeout_close: float = cl['udp.thread_close_timeout_s']
+        self.log = logging.getLogger('UDP Server')
+
+        self.log = logging.getLogger('UDP Server')
 
     def start(self) -> bool:
         # Start server listener Thread
@@ -81,19 +85,18 @@ class UdpServer:
     def stop(self) -> None:
         self.server_cancelled = True
         if self.thread_udp is not None:
-            self.print_log('Waiting for server thread to end')
+            self.log.info('Waiting for Udp server thread to end')
             self.thread_udp.join(3.0)
             if self.thread_udp.is_alive():
-                self.print_log('Could not stop udp server thread properly!')
+                self.log.error('Udp server thread did not stop within given timeout!')
         if self.command_worker_thread is not None:
-            self.print_log('Waiting for command thread to end')
+            self.log.info('Waiting for Udp command thread to end')
             # self.message_queue.clear()
             # insert dummy to notify command worker thread
             self.message_queue.put(-1, block=True)
             self.command_worker_thread.join(3.0)
             if self.command_worker_thread.is_alive():
-                print(self.message_queue.empty())
-                self.print_log('Could not stop udp command thread properly!')
+                self.log.error('Udp command thread did not stop within given timeout!')
 
     # Tuple with status of the worker thread and server thread
     # False means not running
@@ -114,7 +117,7 @@ class UdpServer:
             self.processor = None
         else:
             self.processor = None
-        self.print_log('Mode changed to ', mode.name)
+        self.log.info(f'Mode changed to {mode.name}')
 
     def udp_server_thread(self) -> bool:
         while not self.waiting_for_notification:
@@ -125,13 +128,13 @@ class UdpServer:
         self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.udp_socket.settimeout(0.5)
         self.udp_socket.bind(('', self.PORT))
-        self.print_log("Server ready on port ", self.PORT)
+        self.log.info(f'Server completed startup on port {self.PORT}')
         while 1:
             try:
                 bytes, address = self.udp_socket.recvfrom(self.BUFFER_SIZE)
             except socket.timeout:
                 if self.server_cancelled:
-                    self.print_log('Return normally from cancelled thread ', threading.current_thread().name)
+                    self.log.info(f'Terminate Udp thread after receiving cancel signal {threading.current_thread().name}')
                     return True
                 continue
             if bytes is not None:
@@ -155,19 +158,16 @@ class UdpServer:
                     self.message_queue.queue.clear()
                     return True
                 msg, address = message      # self.message_queue.pop()
-            except IndexError as e:
-                self.print_log(f'[UDP worker] Error when accessing the command queue: \
-                               {threading.current_thread().ident}: {e}')
+            except IndexError:
+                self.log.exception(f'[UDP worker] Error when accessing the command queue: \
+                               {threading.current_thread().ident}')
                 continue
             ret = None
             if self.processor is not None:
                 ret = self.processor.process_message(msg)
             if ret is not None and ret != "":
                 n_bytes = self.udp_socket.sendto(ret.encode('utf-8'), address)
-                self.print_log('[UDP worker] Send ', n_bytes, ' bytes to ', address)
-
-    def print_log(self, *args, **kwargs):
-        Log.log('[UPD SERVER ' + self.mode.name + '] ', *args, **kwargs)
+                self.log.info(f'Send {n_bytes}B to {address}')
 
     @staticmethod
     def recvall(conn, remains):

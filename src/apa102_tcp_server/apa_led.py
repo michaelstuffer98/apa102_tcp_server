@@ -1,4 +1,5 @@
 from apa102_pi.driver import apa102
+import logging
 import time
 import threading
 from apa102_tcp_server.inet_utils import ServerOperationMode as Mode
@@ -53,9 +54,11 @@ class LedStrip:
         self.initial_brightness = cl['visual.initial_brightness']
         self.initial_color = cl['visual.initial_color']
 
+        self.log = logging.getLogger('APA_LED')
+
     # Worker thread at fixed time interval (synchronous), allows interpolation
     def loop(self) -> None:
-        print("[LED Stripe] Start LED Looping")
+        self.log.info('Start LED Looping')
         while self.running:
             counter = 0
             start_time = time.process_time()
@@ -69,14 +72,14 @@ class LedStrip:
                 counter = counter + 1
             # Update step took linger than the specified tick_rate
             if counter == 0:
-                print('[LED STRIPE] WARNING: tick rate is too fast!')
+                self.log.warning('tick rate is too fast!')
                 if self.mode == Mode.SOUND:
                     self.peak_step_size = self.peak_step_size + 1
-                    print('[LED STRIPE] ==> Increased step size (', self.peak_step_size, ')')
+                    self.log.info(f' ==> Increased step size ({self.peak_step_size})')
                 if self.mode == Mode.NORMAL:
                     # TODO handle too fast loop speed
                     pass
-        print("[LED Stripe] Stop LED Looping")
+        self.log.info('Stop LED Looping')
         return
 
     def change_mode(self, mode: Mode) -> None:
@@ -214,14 +217,14 @@ class LedStrip:
         return error
 
     def get_status(self) -> tuple[str, float, int]:
-        return (self.mode.name,
-                (self.desired_brightness * 100.0),
-                self.get_color_as_int())
+        return {'modes': self.mode.name,
+                'brightness': self.desired_brightness * 100.0,
+                'color': self.get_color_as_int()}
 
     def start(self) -> bool:
         # check if thread is already/still running
         if self.running:
-            print('[LED stripe] Loop is already running!')
+            self.log.warning('Tried to invoke startup, but thread is already running!')
             return True
         # start the thread and initialize values to default
         self.looper_thread = threading.Thread(target=self.loop, name='LED_stripe_updater', args=(), daemon=True)
@@ -236,13 +239,13 @@ class LedStrip:
 
     def read_table_file(self, filename: str) -> bool:
         try:
-            for line in open(filename, encoding='utf-8'):
+            for line in open(filename, 'r', encoding='utf-8'):
                 self.peak_table.append(float(line))
-        except OSError as e:
-            print("Error while reading file: ", e)
+        except OSError:
+            self.log.exception('Error while reading in peak table file!')
             return False
-        except ValueError as e:
-            print("Error while converting file content: ", e)
+        except ValueError:
+            self.log.exception("Error while converting peak table file content!")
             return False
         return True
 
@@ -268,3 +271,8 @@ class LedStrip:
             self.intensity = 0.0
             self.peak_progress = -1
         return
+
+    def __str__(self) -> str:
+        status = self.get_status()
+        return f"Mode: {status['mode']}, Brightness: {status['brightness']}, Color RGB: {status['color']}"
+

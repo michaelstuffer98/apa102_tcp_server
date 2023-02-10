@@ -8,6 +8,7 @@ from apa102_tcp_server.log import Log
 from apa102_tcp_server.led_audio_controller import Controller
 from apa102_tcp_server.inet_utils import Client, ServerOperationMode, Command, ServerState, TcpMessageTypes
 from apa102_tcp_server.config_laoder import ConfigLoader
+import logging
 
 
 class TcpServer:
@@ -41,9 +42,11 @@ class TcpServer:
         self.thread_locker = threading.Lock()
         self.stop_timeout = cl['tcp.thread_close_timeout_s']
 
+        self.log = logging.getLogger('TCP SERVER')
+
     def start(self, controller: Controller) -> None:
         # start listener thread
-        self.print_log('Startup')
+        self.log.info('Invoke Tcp Server startup')
         self.server_terminated = False
         if not self.thread_tcp.is_alive():
             self.thread_tcp.start()
@@ -53,16 +56,16 @@ class TcpServer:
         # stop the listener thread
         self.server_terminated = True
         n = self.close_all()
-        self.print_log('Closed all connections (', n, ')')
-        self.print_log('Waiting 5 seconds for TCP thread to stop')
+        self.log.info(f'Closed all connections ({n})')
+        self.log.info(f'Waiting {self.stop_timeout} seconds for TCP thread to stop')
         self.thread_tcp.join(self.stop_timeout)
         if not self.thread_tcp.is_alive():
-            self.print_log('TCP thread stopped')
+            self.log.info('TCP thread stopped normally')
         else:
-            self.print_log('Timeout, could not stop tcp thread!')
+            self.log.error('Could not stop tcp thread within given timeout!')
             return
         self.socket.close()
-        self.print_log('TCP server stopped successfully')
+        self.log.info('TCP server stopped successfully')
 
     def listener(self) -> int:
         # Wait for Client to connect
@@ -77,30 +80,31 @@ class TcpServer:
                 break
             except AttributeError:
                 if first:
-                    print('Wait for setup...')
+                    self.log.info('Wait for setup...')
                     first = False
                 pass
         self.controller.state = ServerState.OPEN
-        self.print_log("Server ready on port ", self.PORT)
+        self.log.info(f"Server ready on port {self.PORT}")
         while True:
             # Incoming connection
             try:
                 if self.server_terminated:
+                    self.log.info(f'Incomming connection listener stops because server has been terminated')
                     return 0
                 client_socket, client_address = self.socket.accept()
             except socket.timeout:
                 continue
             except OSError as e:
-                self.print_log('listener thread: ', e)
-                return 1
+                self.log.exception(f'Listener thread received an error while accepting incomming connection!')
+                return 2
 
-            self.print_log('New connection request from ' + client_address[0] + ':' + str(client_address[1]))
+            self.log.info(f'New connection request from {client_address[0]}: {client_address[1]}')
             # Close connection, if maximum number of clients are already connected
             if len(self.connected_clients) >= self.MAX_CLIENTS:
                 client = Client(client_address[0], client_address[1], client_socket)
                 client.send_message("REFUSED")
                 client_socket.close()
-                self.print_log(f'Connection refused: {client_address[0]}: {str(client_address[1])}\
+                self.log.warning(f'Connection refused: {client_address[0]}: {str(client_address[1])}\
                                because no more clients can connect.')
                 continue
 
@@ -109,7 +113,7 @@ class TcpServer:
             # Register Client:
             client = Client(client_address[0], client_address[1], client_socket)
             self.connected_clients.append(client)
-            self.print_log(f'Connection accepted ({len(self.connected_clients)} total connections):\
+            self.log.info(f'Connection accepted ({len(self.connected_clients)} total connections):\
                             {client_address[0]}: {str(client_address[1])}')
             client.send_message(json.dumps({'type': TcpMessageTypes.CONNECTION_ACCEPTED.name, 'message': '0'}))
             # Start the client routine
@@ -118,35 +122,34 @@ class TcpServer:
                                                   args=(client,))
                 handler_thread.start()
             except Exception as e:
-                self.print_log("Error in Client Thread (", client.client_id, ")")
+                self.log.exception(f"Error in Client Thread ({client.client_id})")
                 self.close_client_connection(client.client_id)
                 self.controller.state = ServerState.CLOSED
-                self.print_log(str(e))
 
     def client_routine(self, client: Client) -> bool:
         while 1:
-            length_data = self.receive_all(client.client_socket, self.MAX_DIGITS_MESSAGE)
+            length_data = self.receive_all(client.client_socket, self.MAX_DIGITS_MESSAGE, self.log)
             if not length_data:
-                self.print_log('Connection ' + str(client.client_id), 'has been closed by remote device')
+                self.log.info(f'Connection {client.client_id} has been closed by remote device')
                 self.close_client_connection(client.client_id)
                 return True
-            self.print_log('<== Received from client [', client.client_id, '] ', length_data, ' Bytes')
+            self.log.info(f'<== Received from client {client.ip} {length_data}B')
             try:
-                data_rec = self.receive_all(client.client_socket, int(length_data))
+                data_rec = self.receive_all(client.client_socket, int(length_data), self.log)
             except ValueError:
-                self.print_log('Failed parsing command length to int')
+                self.log.exception(f'Failed parsing command length to int, close connection at {client.ip}')
                 self.close_client_connection(client.client_id)
                 return False
             if not data_rec:
-                self.print_log('Failed to read ', length_data, ' Bytes')
+                self.log.error(f'Failed to read {length_data}B from {client.ip}, close connection')
                 self.close_client_connection(client.client_id)
                 return False
             cmd_nr, cmd_val = self.parse_command(self, data_rec)
             if cmd_nr is None or cmd_val is None:
-                self.print_log('Invalid Command Signature (pattern)')
+                self.log.error(f'Invalid Command Signature (pattern), got {data_rec}')
                 client.send_message('Invalid Command Pattern')
                 continue
-            self.print_log("Client [", client.client_id, "]: CMD ", cmd_nr, '(', cmd_val, ')')
+            self.log.info(f"Client {client.ip}: CMD n:{cmd_nr} v:{cmd_val}")
             try:
                 self.notificator_commands.acquire()
                 self.command_queue.put(Command(cmd_nr, cmd_val, client))
@@ -155,19 +158,19 @@ class TcpServer:
                 self.notificator_commands.release()
 
     @staticmethod
-    def receive_all(conn: socket.socket, remains) -> str:
+    def receive_all(conn: socket.socket, remains, log) -> str:
         buf = ''
         while remains:
             try:
                 data = conn.recv(remains).decode('utf-8')
             except ConnectionResetError:
-                print('[Client ', threading.get_ident(), '] Remote connection closed by remote device')
+                log.exception(f'Client {threading.get_ident()}: Remote connection closed by remote device')
                 return
             except ConnectionAbortedError:
-                print('[Client ', threading.get_ident(), '] Remote connection aborted')
+                log.exception(f'Client {threading.get_ident()}: Remote connection aborted')
                 return
             except OSError:
-                print('[Client ', threading.get_ident(), '] Connection down')
+                log.exception(f'Client {threading.get_ident()}: Connection down')
                 return
             if not data:
                 break
@@ -189,7 +192,7 @@ class TcpServer:
         for c in self.connected_clients:
             if isinstance(c, Client) and c.client_id == client_id:
                 success = c.close()
-                self.print_log('Terminated TCP connection of client [', client_id, ']: ' + c.ip + ':' + str(c.port))
+                self.log.info(f'Closed TCP connection at {c.ip}')
                 self.connected_clients.remove(c)
                 if len(self.connected_clients) == 0:
                     self.controller.state = ServerState.OPEN
@@ -200,11 +203,11 @@ class TcpServer:
 
     def close_all(self) -> int:
         counter = 0
-        for s in self.connected_clients:
-            if isinstance(s, Client):
-                s.close()
+        for c in self.connected_clients:
+            if isinstance(c, Client):
+                c.close()
                 self.connected_clients.remove(s)
-                self.print_log('   Terminated TCP connection of client: ' + s.ip + ':' + str(s.port))
+                self.log.info(f'   Terminated TCP connection at {c.ip}')
                 counter = counter + 1
         return counter
 
@@ -219,7 +222,3 @@ class TcpServer:
             self.command_queue.get(block=False)
         self.command_queue.queue.clear()
         self.command_queue.put(Command(-1, -1, None))
-
-    @staticmethod
-    def print_log(*args, **kwargs):
-        Log.log('[TCP SERVER] ', *args, **kwargs)

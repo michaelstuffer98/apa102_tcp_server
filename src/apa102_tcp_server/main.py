@@ -1,6 +1,8 @@
 import argparse
 import led_audio_controller as controller
+import logging
 import test_server as tester
+import time
 import textwrap
 
 
@@ -28,6 +30,9 @@ def main() -> None:
                         defaults to './data/config.yaml'"""))
 
     args = argparser.parse_args()
+    
+    now = time.strftime('%Y-%m-%d_%H:%M:%S', time.localtime())
+    logging.basicConfig(filename=f'{now}.log', format='%(asctime)s-%(levelname)s from %(name)s: %(message)s', level=logging.DEBUG)
 
     args.component.main(args)
 
