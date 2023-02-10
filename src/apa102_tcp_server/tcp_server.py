@@ -6,6 +6,8 @@ import re
 from apa102_tcp_server.log import Log
 from apa102_tcp_server.led_audio_controller import Controller
 from apa102_tcp_server.inet_utils import Client, ServerOperationMode, Command, ServerState, TcpMessageTypes
+from apa102_tcp_server.config_laoder import ConfigLoader
+
 
 class TcpServer:
     # Constants
@@ -22,8 +24,8 @@ class TcpServer:
     connected_clients = []
     #Incomming commands
 
-    def __init__(self, tcp_port: int, condition_var: threading.Condition, buffer_size: int = 1024, max_clients: int = 1) -> None:
-        self.PORT = tcp_port
+    def __init__(self, cl: ConfigLoader, condition_var: threading.Condition, buffer_size: int = 1024, max_clients: int = 1) -> None:
+        self.PORT = cl.get_key('tcp.port')
         self.BUFFER_SIZE = buffer_size
         # Internet Socket
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -35,6 +37,8 @@ class TcpServer:
         self.notificator_commands = condition_var
         self.command_queue = queue.Queue()
         self.thread_locker = threading.Lock()
+        self.stop_timeout = cl.get_key('tcp.thread_close_timeout_s')
+
 
     def start(self, controller: Controller) -> None:
         # start listener thread
@@ -50,7 +54,7 @@ class TcpServer:
         n = self.close_all()
         self.print_log('Closed all connections (', n, ')')
         self.print_log('Waiting 5 seconds for TCP thread to stop')
-        self.thread_tcp.join(5.0)
+        self.thread_tcp.join(self.stop_timeout)
         if not self.thread_tcp.is_alive():
             self.print_log('TCP thread stopped')
         else:

@@ -1,12 +1,7 @@
 from apa102_tcp_server.log import Log
 import socket
 from enum import Enum
-### Port declarations ###
 
-#   broadcast of rpi ip address and streaming data
-UDP_PORT = 9999
-#   tcp commands
-TCP_PORT    = 5005
 
 # build the message:
 #   4 digits to specify legth of following message in bytes

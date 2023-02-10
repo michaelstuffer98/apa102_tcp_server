@@ -8,18 +8,23 @@ from apa102_tcp_server.log import Log
 import apa102_tcp_server.inet_utils as tc
 from apa102_tcp_server.log import Log
 import json
+from apa102_tcp_server.config_laoder import ConfigLoader
+from os import path
+
 
 # General controlling unit, handles and delegates all basic program work-flow
 class Controller:
 
-    def __init__(self):
+    def __init__(self, config_name):
+        cl = ConfigLoader(path.join('./data', config_name))
+
         self.new_command_received = threading.Condition()
         
         # setup and initialize LED Strip
-        self.led_strip = LedStrip(tick_rate_ms=10, num_led=120)
+        self.led_strip = LedStrip(cl)
 
-        self.tcp_server = Tcp.TcpServer(tc.TCP_PORT, self.new_command_received)
-        self.udp_server = Udp.UdpServer(udp_port=tc.UDP_PORT, server_mode=tc.ServerOperationMode.BC, server_ident="MICHI_PI_3", tcp_info=str(tc.TCP_PORT), stream_data_function=self.led_strip.set_intensity)
+        self.tcp_server = Tcp.TcpServer(cl, self.new_command_received)
+        self.udp_server = Udp.UdpServer(cl, server_mode=tc.ServerOperationMode.BC, stream_data_function=self.led_strip.set_intensity)
 
         self.command_thread = threading.Thread(target=self.command_worker)
         self.cmd_switch = CmdSwitch(self)
@@ -148,7 +153,7 @@ class CmdSwitch:
 
 if __name__=='__main__':
     # Start routine
-    controller = Controller()
+    controller = Controller(config_name='config.yaml')
     controller.start()
     while 1:
         key = input('')

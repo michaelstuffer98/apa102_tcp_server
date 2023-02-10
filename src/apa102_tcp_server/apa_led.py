@@ -2,6 +2,7 @@ from apa102_pi.driver import apa102
 import time
 import threading
 from apa102_tcp_server.inet_utils import ServerOperationMode as Mode
+from apa102_tcp_server.config_laoder import ConfigLoader
 
 
 class LedStrip:
@@ -21,22 +22,18 @@ class LedStrip:
     new_value: bool = False
     peak_table = []
     peak_progress: int = 0
-    peak_Step_size: int = 1
-    min_intensity_sound: float = 0.05
     mode: Mode = Mode.NORMAL
     looper_thread = threading.Thread
-    # interpolation step-size in each loop of duration 'tick-rate'
-    color_interpolation_speed = 0.03
-    brightness_interpolation_speed = 0.01
-    color_equal_th = 1.0
 
-    def __init__(self, tick_rate_ms=10, num_led=120):
+
+    def __init__(self, cl: ConfigLoader):
         # stripe setup
-        self.strip = apa102.APA102(num_led=num_led, mosi=10, sclk=11, order='rgb')
+        self.strip = apa102.APA102(num_led=cl.get_key('strip.num_led'), mosi=cl.get_key('strip.mosi'),
+                                   sclk=cl.get_key('strip.sclk'), order=cl.get_key('strip.color_order'))
         self.strip.set_global_brightness(31)
         self.strip.clear_strip()
         # passed to constructor, stored in seconds
-        self.tick_rate: float = tick_rate_ms / 1000
+        self.tick_rate: float = cl.get_key('visual.tick_rate_ms') / 1000
         # Update-Thread variables
         self.read_table_file('./data/table_peak')
         self.paused = False
@@ -44,6 +41,18 @@ class LedStrip:
         self.r_desired = 100
         self.g_desired = 100
         self.b_desired = 100
+
+        # interpolation step-size in each loop of duration 'tick-rate'
+        self.color_interpolation_speed: float = cl.get_key('visual.color_interpolation_speed')
+        self.brightness_interpolation_speed: float = cl.get_key('visual.brightness_interpolation_speed')
+        self.color_equal_th: float = cl.get_key('visual.color_equal_threshold')
+        # peak
+        self.peak_step_size: int = cl.get_key('visual.peak_step_size')
+        self.min_intensity_sound: float = cl.get_key('visual.min_intensity_sound')
+        # initial values
+        self.initial_brightness = cl.get_key('visual.initial_brightness')
+        self.initial_color = cl.get_key('visual.initial_color')
+
 
     # Worker thread at fixed time interval (synchronous), allows interpolation
     def loop(self):
@@ -64,8 +73,8 @@ class LedStrip:
             if counter == 0:
                 print('[LED STRIPE] WARNING: tick rate is too fast!')
                 if self.mode == Mode.SOUND:
-                    self.peak_Step_size = self.peak_Step_size + 1 
-                    print('[LED STRIPE] ==> Increased step size (', self.peak_Step_size,')')
+                    self.peak_step_size = self.peak_step_size + 1 
+                    print('[LED STRIPE] ==> Increased step size (', self.peak_step_size,')')
                 if self.mode == Mode.NORMAL:
                     # TODO handle too fast loop speed
                     pass
@@ -207,9 +216,9 @@ class LedStrip:
         self.looper_thread.start()
         # Init color white
         self.r = self.g = self.b = 0
-        self.r_desired = self.g_desired = self.b_desired = 100
+        self.r_desired, self.g_desired, self.b_desired = self.initial_color
         self.brightness = 0.0
-        self.desired_brightness = 0.5
+        self.desired_brightness = self.initial_brightness
         return self.looper_thread.is_alive()
 
     def read_table_file(self, filename: str):
@@ -240,7 +249,7 @@ class LedStrip:
 
     def peak(self):
         self.brightness = self.peak_table[self.peak_progress] * self.intensity
-        self.peak_progress = self.peak_progress + self.peak_Step_size
+        self.peak_progress = self.peak_progress + self.peak_step_size
         if self.peak_progress >= len(self.peak_table):
             self.intensity = 0.0
             self.peak_progress = -1

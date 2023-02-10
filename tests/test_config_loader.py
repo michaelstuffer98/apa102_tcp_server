@@ -18,3 +18,5 @@ def test_config_loader_config_file():
 
     for key in loader.config.keys():
         loader.get_key(key)
+
+    assert type(loader.get_key('visual.initial_color')) == tuple

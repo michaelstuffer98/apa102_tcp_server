@@ -5,6 +5,7 @@ import re
 import json
 import apa102_tcp_server.inet_utils as tc
 from apa102_tcp_server.log import Log 
+from apa102_tcp_server.config_laoder import ConfigLoader
 
 
 class UdpServer:
@@ -24,17 +25,20 @@ class UdpServer:
     server_cancelled: bool = False
     waiting_for_notification = False
 
-    def __init__(self, udp_port: int, server_mode: tc.ServerOperationMode, server_ident: str, tcp_info: str, stream_data_function, buffer_size: int = 256):
-        self.PORT: int = udp_port
+    def __init__(self, cl: ConfigLoader, server_mode: tc.ServerOperationMode, stream_data_function, buffer_size: int = 256):
+        self.PORT: int = cl.get_key('udp.port'),
         self.BUFFER_SIZE = buffer_size
         self.mode = server_mode
         # Listener Thread
         self.thread_udp: threading.Thread = None
         self.command_worker_thread: threading.Thread = None
-        self.ident = server_ident
-        self.tcp_info = tcp_info
-        self.processor = ProcessorBc(server_ident, tcp_info)
+        self.ident = cl.get_key('udp.server_ident'),
+        self.tcp_info = cl.get_key('tcp.port'),
+        self.processor = ProcessorBc(self.server_ident, self.tcp_info)
         self.stream_data_function = stream_data_function
+        self.timeout_start = cl.get_key('udp.thread_start_timeout_s')
+        self.timeout_close = cl.get_key('udp.thread_close_timeout_s')
+    
 
     def start(self) -> bool:
         # Start server listener Thread

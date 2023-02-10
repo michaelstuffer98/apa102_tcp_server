@@ -1,25 +1,22 @@
 tcp:
   port: 5005
-  buffer_size: 1024
   thread_close_timeout_s: 5.0
-  max_clients: 1
 udp:
   port: 9999
   server_ident: MICHI_PI_3
-  buffer_size: 256
-  timeout_thread_start_s: 3.0
+  thread_start_timeout_s: 3.0
   thread_close_timeout_s: 3.0
 strip:
   num_led: 120
-  tick_rate_ms: 10
   mosi_pin: 10
   sclk_pin: 11
   color_order: 'rgb'
-visualization:
+visual:
+  tick_rate_ms: 10
   peak_step_size: 1
   min_intensity_sound: 0.05
   color_interpolation_speed: 0.03
   brightness_interpolation_speed: 0.01
   color_equal_threshold: 1.0
   initial_brightness: 0.5
-  initial_color: [100, 100, 100]
+  initial_color: !!python/tuple [100, 100, 100]
