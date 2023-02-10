@@ -1,0 +1,7 @@
+key1: 1
+key2:
+  sub_key1: 1.5
+  sub_key2:
+    subsub_key1: test
+    subsub_key2: 3
+key3: [1, 2, 3]
