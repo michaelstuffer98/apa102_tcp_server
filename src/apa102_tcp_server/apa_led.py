@@ -38,7 +38,7 @@ class LedStrip:
         # passed to constructor, stored in seconds
         self.tick_rate: float = tick_rate_ms / 1000
         # Update-Thread variables
-        self.read_table_file('table_peak')
+        self.read_table_file('./data/table_peak')
         self.paused = False
         self.condition_paused = threading.Condition()#
         self.r_desired = 100
