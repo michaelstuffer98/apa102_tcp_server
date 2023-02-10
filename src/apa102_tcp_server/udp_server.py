@@ -116,7 +116,7 @@ class UdpServer:
         self.print_log('Mode changed to ', mode.name)
 
     def udp_server_thread(self) -> bool:
-        while(not self.waiting_for_notification):
+        while not self.waiting_for_notification:
             if self.server_cancelled:
                 return
         with self.condition_server:
@@ -140,7 +140,7 @@ class UdpServer:
             #    self.condition_queue.notify()
 
     def command_worker(self):
-        while(not self.waiting_for_notification):
+        while not self.waiting_for_notification:
             if self.server_cancelled:
                 return
         with self.condition_worker:
