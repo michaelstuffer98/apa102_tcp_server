@@ -196,7 +196,7 @@ class LedStrip:
         return (self.mode.name, 
                 (self.desired_brightness*100),
                 self.get_color())
-        
+
     def start(self) -> bool:
         # check if thread is already/still running
         if self.running:
