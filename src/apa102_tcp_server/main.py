@@ -1,9 +1,10 @@
 import argparse
-import led_audio_controller as controller
 import logging
-import test_server as tester
-import time
 import textwrap
+import time
+
+import led_audio_controller as controller
+import test_server as tester
 
 
 def main() -> None:

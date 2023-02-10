@@ -1,7 +1,8 @@
+from os import PathLike, path
+from typing import Any
+
 import yaml
 from yaml.loader import FullLoader
-from os import path, PathLike
-from typing import Any
 
 
 class ConfigLoader:

@@ -1,6 +1,7 @@
 import socket
-import time
 import threading
+import time
+
 from apa102_tcp_server.inet_utils import TcpCommandType as CMD
 
 cancelled: bool = False

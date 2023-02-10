@@ -1,13 +1,14 @@
+import json
+import logging
 import queue
+import re
 import socket
 import threading
-import re
-import json
 from typing import Callable
-import logging
+
 import apa102_tcp_server.inet_utils as tc
-from apa102_tcp_server.log import Log
 from apa102_tcp_server.config_laoder import ConfigLoader
+from apa102_tcp_server.log import Log
 
 
 class UdpServer:

@@ -1,17 +1,19 @@
 #!/usr/bin/python
 from __future__ import annotations
-import threading
-from apa102_tcp_server.apa_led import LedStrip
-import apa102_tcp_server.tcp_server as Tcp
-import apa102_tcp_server.udp_server as Udp
-from apa102_tcp_server.log import Log
-import apa102_tcp_server.inet_utils as tc
+
 import json
 import logging
-from apa102_tcp_server.config_laoder import ConfigLoader
+import threading
+from argparse import Namespace
 from os import PathLike
 from typing import Callable
-from argparse import Namespace
+
+import apa102_tcp_server.inet_utils as tc
+import apa102_tcp_server.tcp_server as Tcp
+import apa102_tcp_server.udp_server as Udp
+from apa102_tcp_server.apa_led import LedStrip
+from apa102_tcp_server.config_laoder import ConfigLoader
+from apa102_tcp_server.log import Log
 
 
 # General controlling unit, handles and delegates all basic program work-flow

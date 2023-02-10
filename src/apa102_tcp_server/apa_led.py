@@ -1,10 +1,12 @@
-from apa102_pi.driver import apa102
 import logging
-import time
 import threading
-from apa102_tcp_server.inet_utils import ServerOperationMode as Mode
-from apa102_tcp_server.config_laoder import ConfigLoader
+import time
 from typing import List
+
+from apa102_pi.driver import apa102
+
+from apa102_tcp_server.config_laoder import ConfigLoader
+from apa102_tcp_server.inet_utils import ServerOperationMode as Mode
 
 
 class LedStrip:

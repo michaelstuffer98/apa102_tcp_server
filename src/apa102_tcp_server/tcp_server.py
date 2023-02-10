@@ -1,14 +1,16 @@
 import json
+import logging
 import queue
+import re
 import socket
 import threading
-import re
 from typing import List
-from apa102_tcp_server.log import Log
-from apa102_tcp_server.led_audio_controller import Controller
-from apa102_tcp_server.inet_utils import Client, ServerOperationMode, Command, ServerState, TcpMessageTypes
+
 from apa102_tcp_server.config_laoder import ConfigLoader
-import logging
+from apa102_tcp_server.inet_utils import (Client, Command, ServerOperationMode,
+                                          ServerState, TcpMessageTypes)
+from apa102_tcp_server.led_audio_controller import Controller
+from apa102_tcp_server.log import Log
 
 
 class TcpServer:

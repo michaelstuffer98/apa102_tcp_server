@@ -1,7 +1,6 @@
+import logging
 import socket
 from enum import Enum
-import logging
-
 
 # build the message:
 #   4 digits to specify legth of following message in bytes
