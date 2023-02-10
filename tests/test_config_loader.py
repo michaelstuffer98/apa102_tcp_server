@@ -1,6 +1,11 @@
 from apa102_tcp_server.config_laoder import ConfigLoader
 import os
-from directories import tests_directory
+import pytest
+
+
+@pytest.fixture
+def tests_directory():
+    return './tests/'
 
 
 def test_config_loader_key_access(tests_directory):
