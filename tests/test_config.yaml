@@ -5,3 +5,5 @@ key2:
     subsub_key1: test
     subsub_key2: 3
 key3: [1, 2, 3]
+key4: !!python/tuple [1, 2, 3]
+

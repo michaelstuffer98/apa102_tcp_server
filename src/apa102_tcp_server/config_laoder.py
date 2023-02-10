@@ -21,3 +21,7 @@ class ConfigLoader:
             value = value[key]
 
         return value
+
+
+    def __getitem__(self, key):
+        return self.get_key(key)
