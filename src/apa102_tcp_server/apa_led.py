@@ -3,6 +3,7 @@ import time
 import threading
 from apa102_tcp_server.inet_utils import ServerOperationMode as Mode
 from apa102_tcp_server.config_laoder import ConfigLoader
+from typing import List
 
 
 class LedStrip:
@@ -14,18 +15,18 @@ class LedStrip:
     g_desired: float = 0.0
     b_desired: float = 0.0
     # brightness
-    brightness = 0.0
-    desired_brightness = 0.0
+    brightness: float = 0.0
+    desired_brightness: float = 0.0
     running: bool = False
     # Peak variables
     intensity: float = 0.0
     new_value: bool = False
-    peak_table = []
+    peak_table: List[float] = []
     peak_progress: int = 0
     mode: Mode = Mode.NORMAL
-    looper_thread = threading.Thread
+    looper_thread: threading.Thread
 
-    def __init__(self, cl: ConfigLoader):
+    def __init__(self, cl: ConfigLoader) -> None:
         # stripe setup
         self.strip = apa102.APA102(num_led=cl['strip.num_led'], mosi=cl['strip.mosi'],
                                    sclk=cl['strip.sclk'], order=cl['strip.color_order'])
@@ -53,7 +54,7 @@ class LedStrip:
         self.initial_color = cl['visual.initial_color']
 
     # Worker thread at fixed time interval (synchronous), allows interpolation
-    def loop(self):
+    def loop(self) -> None:
         print("[LED Stripe] Start LED Looping")
         while self.running:
             counter = 0
@@ -66,7 +67,6 @@ class LedStrip:
             # Wait until loop time expired, synchronous worker
             while (time.process_time() - start_time) <= self.tick_rate:
                 counter = counter + 1
-                pass
             # Update step took linger than the specified tick_rate
             if counter == 0:
                 print('[LED STRIPE] WARNING: tick rate is too fast!')
@@ -79,7 +79,7 @@ class LedStrip:
         print("[LED Stripe] Stop LED Looping")
         return
 
-    def change_mode(self, mode: Mode):
+    def change_mode(self, mode: Mode) -> None:
         self.mode = mode
         if mode == Mode.BC or mode == Mode.OFF:
             self.stop()
@@ -120,15 +120,25 @@ class LedStrip:
         self.b = (dif_b) * self.color_interpolation_speed + self.b
         return True
 
-    def set_brightness(self, b: int):
+    def set_brightness(self, b: int) -> bool:
         self.desired_brightness = (b / 100.0)
-        with self.condition_paused:
-            self.condition_paused.notify()
+        try:
+            with self.condition_paused:
+                self.condition_paused.notify()
+        except RuntimeError:
+            # TODO: Log exception occurance
+            return False
+        return True
 
-    def set_color(self, color: int):
+    def set_color(self, color: int) -> bool:
         self.r_desired, self.g_desired, self.b_desired = self.get_rgb_from_scaled_color(color, scaled=False)
-        with self.condition_paused:
-            self.condition_paused.notify()
+        try:
+            with self.condition_paused:
+                self.condition_paused.notify()
+        except RuntimeError:
+            # TODO: Log exception occurance
+            return False
+        return True
 
     # Performs one interpolation step between desired and current LED values and applies changes to the stripe
     def update(self) -> bool:
@@ -151,10 +161,10 @@ class LedStrip:
             self.strip.set_pixel_rgb(i, color)
         self.strip.show()
 
-    def get_strip_info(self):
-        return (int(self.desired_brightness), self.get_color())
+    def get_strip_info(self) -> tuple[int, int]:
+        return (int(self.desired_brightness), self.get_color_as_int())
 
-    def get_color(self, scaled: bool = False) -> int:
+    def get_color_as_int(self, scaled: bool = False) -> int:
         r = self.r
         g = self.g
         b = self.b
@@ -166,7 +176,7 @@ class LedStrip:
 
     # Convert R, G, B, to a single color Integer value
     # Set scaled=True to apply brightness multiplicator
-    def get_scaled_color_from_rgb(self, r, g, b, scaled: bool = True) -> int:
+    def get_scaled_color_from_rgb(self, r: int, g: int, b: int, scaled: bool = True) -> int:
         if scaled:
             r = r * self.brightness
             g = g * self.brightness
@@ -175,7 +185,7 @@ class LedStrip:
 
     # Use scaled property to apply brightness multiplicator
     # Extracts R, G, B from an color integer (without alpha)
-    def get_rgb_from_scaled_color(self, color: int, scaled: bool = True):
+    def get_rgb_from_scaled_color(self, color: int, scaled: bool = True) -> tuple[int, int, int]:
         if self.brightness == 0:
             return 0, 0, 0
         r = color & 0xFF
@@ -186,21 +196,27 @@ class LedStrip:
         else:
             return int(r), int(g), int(b)
 
-    def stop(self, force_stop=False):
+    def stop(self, force_stop: bool = False) -> bool:
         # Reset color LED setup
         self.brightness = self.r = self.g = self.b = 0
+        error = False
         self.update_strip()
         # Stop the thread
         self.running = False
-        with self.condition_paused:
-            self.condition_paused.notify()
+        try:
+            with self.condition_paused:
+                self.condition_paused.notify()
+        except RuntimeError:
+            # TODO: Log exception
+            error = True
         time.sleep(self.tick_rate)
         self.looper_thread = None
+        return error
 
-    def get_status(self):
+    def get_status(self) -> tuple[str, float, int]:
         return (self.mode.name,
-                (self.desired_brightness * 100),
-                self.get_color())
+                (self.desired_brightness * 100.0),
+                self.get_color_as_int())
 
     def start(self) -> bool:
         # check if thread is already/still running
@@ -218,19 +234,20 @@ class LedStrip:
         self.desired_brightness = self.initial_brightness
         return self.looper_thread.is_alive()
 
-    def read_table_file(self, filename: str):
+    def read_table_file(self, filename: str) -> bool:
         try:
             for line in open(filename, encoding='utf-8'):
                 self.peak_table.append(float(line))
         except OSError as e:
             print("Error while reading file: ", e)
-            return
+            return False
         except ValueError as e:
             print("Error while converting file content: ", e)
-            return
+            return False
+        return True
 
     # interface to publish stream data to strip
-    def set_intensity(self, value: int):
+    def set_intensity(self, value: int) -> None:
         value_f = value / 100.0
         if value_f > 1.0:
             value_f = 1
@@ -244,19 +261,10 @@ class LedStrip:
             self.intensity = value_f
             self.peak_progress = 0
 
-    def peak(self):
+    def peak(self) -> None:
         self.brightness = self.peak_table[self.peak_progress] * self.intensity
         self.peak_progress = self.peak_progress + self.peak_step_size
         if self.peak_progress >= len(self.peak_table):
             self.intensity = 0.0
             self.peak_progress = -1
         return
-
-
-class Status:
-    brightness: int
-    color: int
-
-    def __init__(self, brightness, color) -> None:
-        self.brightness = brightness
-        self.color = color

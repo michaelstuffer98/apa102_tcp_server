@@ -4,7 +4,7 @@ import test_server as tester
 import textwrap
 
 
-def main():
+def main() -> None:
     argparser = argparse.ArgumentParser('APA102 Tcp and Udp Server',
                                         formatter_class=argparse.RawTextHelpFormatter)
 

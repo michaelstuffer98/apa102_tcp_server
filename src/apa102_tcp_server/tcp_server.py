@@ -3,6 +3,7 @@ import queue
 import socket
 import threading
 import re
+from typing import List
 from apa102_tcp_server.log import Log
 from apa102_tcp_server.led_audio_controller import Controller
 from apa102_tcp_server.inet_utils import Client, ServerOperationMode, Command, ServerState, TcpMessageTypes
@@ -122,24 +123,24 @@ class TcpServer:
                 self.controller.state = ServerState.CLOSED
                 self.print_log(str(e))
 
-    def client_routine(self, client: Client):
+    def client_routine(self, client: Client) -> bool:
         while 1:
             length_data = self.receive_all(client.client_socket, self.MAX_DIGITS_MESSAGE)
             if not length_data:
                 self.print_log('Connection ' + str(client.client_id), 'has been closed by remote device')
                 self.close_client_connection(client.client_id)
-                return
+                return True
             self.print_log('<== Received from client [', client.client_id, '] ', length_data, ' Bytes')
             try:
                 data_rec = self.receive_all(client.client_socket, int(length_data))
             except ValueError:
                 self.print_log('Failed parsing command length to int')
                 self.close_client_connection(client.client_id)
-                return
+                return False
             if not data_rec:
                 self.print_log('Failed to read ', length_data, ' Bytes')
                 self.close_client_connection(client.client_id)
-                return
+                return False
             cmd_nr, cmd_val = self.parse_command(self, data_rec)
             if cmd_nr is None or cmd_val is None:
                 self.print_log('Invalid Command Signature (pattern)')
@@ -154,7 +155,7 @@ class TcpServer:
                 self.notificator_commands.release()
 
     @staticmethod
-    def receive_all(conn: socket.socket, remains):
+    def receive_all(conn: socket.socket, remains) -> str:
         buf = ''
         while remains:
             try:
@@ -175,27 +176,27 @@ class TcpServer:
         return buf
 
     @staticmethod
-    def parse_command(self, cmd: str):
+    def parse_command(self, cmd: str) -> List[int, int]:
         if not self.PATTER_COMMAND.match(cmd):
             return [None, None]
         cmd = cmd.split(sep=":")
         return [int(cmd[0]), int(cmd[1])]
 
-    def send_answer(self, client: Client, msg: str):
-        client.send_message(str(msg))
-        return
+    def send_answer(self, client: Client, msg: str) -> bool:
+        return client.send_message(str(msg))
 
-    def close_client_connection(self, client_id: int):
+    def close_client_connection(self, client_id: int) -> bool:
         for c in self.connected_clients:
             if isinstance(c, Client) and c.client_id == client_id:
-                c.close()
+                success = c.close()
                 self.print_log('Terminated TCP connection of client [', client_id, ']: ' + c.ip + ':' + str(c.port))
                 self.connected_clients.remove(c)
                 if len(self.connected_clients) == 0:
                     self.controller.state = ServerState.OPEN
-                return
+                break
         if len(self.connected_clients) == 0:
             self.controller.udp_server.change_mode(ServerOperationMode.BC)
+        return success
 
     def close_all(self) -> int:
         counter = 0
@@ -212,10 +213,10 @@ class TcpServer:
         c = self.command_queue.get(block=True)
         return c
 
-    def terminate_queue(self):
+    def invoke_queue_termination(self) -> None:
         # Enqueue termination process
         while not self.command_queue.empty():
-            self.command_queue.get(block=True)
+            self.command_queue.get(block=False)
         self.command_queue.queue.clear()
         self.command_queue.put(Command(-1, -1, None))
 

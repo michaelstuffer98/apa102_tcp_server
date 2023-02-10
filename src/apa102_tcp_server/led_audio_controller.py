@@ -1,4 +1,5 @@
 #!/usr/bin/python
+from __future__ import annotations
 import threading
 from apa102_tcp_server.apa_led import LedStrip
 import apa102_tcp_server.tcp_server as Tcp
@@ -7,12 +8,15 @@ from apa102_tcp_server.log import Log
 import apa102_tcp_server.inet_utils as tc
 import json
 from apa102_tcp_server.config_laoder import ConfigLoader
+from os import PathLike
+from typing import Callable
+from argparse import Namespace
 
 
 # General controlling unit, handles and delegates all basic program work-flow
 class Controller:
 
-    def __init__(self, config_path):
+    def __init__(self, config_path: str | PathLike) -> None:
         cl = ConfigLoader(config_path)
 
         self.new_command_received = threading.Condition()
@@ -28,34 +32,34 @@ class Controller:
         self.cmd_switch = CmdSwitch(self)
         self.state: tc.ServerState = tc.ServerState.CLOSED
 
-    def start(self):
+    def start(self) -> bool:
         self.print_log('Invoke controler start')
         self.tcp_server.start(self)
         # Start the internet server threads
         self.command_thread.start()
-        self.udp_server.start()
+        return self.udp_server.start()
 
-    def stop(self):
+    def stop(self) -> None:
         # Invoke tcp server stop
         self.print_log('Invoke controler stop')
         # Insert dummy termination command to worker queue
         self.tcp_server.stop()
-        self.tcp_server.terminate_queue()
+        self.tcp_server.invoke_queue_termination()
         self.command_thread.join()
         self.udp_server.stop()
         self.state = tc.ServerState.CLOSED
 
-    def print_server_state(self):
+    def print_server_state(self) -> None:
         self.print_log('SERVER STATE: ', self.state)
 
-    def command_worker(self):
+    def command_worker(self) -> bool:
         while 1:
             c = self.tcp_server.get_next_command()
             if c:
                 # Termination command, enqueued artificially by server-stop routine
                 if c.command == -1 and c.value == -1:
                     self.print_log('Terminate CMD-Worker Thread')
-                    return
+                    return True
                 found = False
                 for client in self.tcp_server.connected_clients:
                     if client.client_id == c.connection.client_id:
@@ -73,7 +77,7 @@ class Controller:
                 else:
                     self.print_log("Closed connection....")
             else:
-                return
+                return False
 
     @staticmethod
     def print_log(*args, **kwargs):
@@ -85,7 +89,7 @@ class CmdSwitch:
         self.controller = controller
         self.command: Tcp.Command = None
 
-    def switch(self, command):
+    def switch(self, command) -> str | tuple[tc.TcpCommandType, Callable[[CmdSwitch, int], str]]:
         self.command = command
         # Resolve the corresponsing function according to the sent cmmand value (refer to enum TcpCommandType)
         default = "Could not resolve command number " + str(command.command)
@@ -102,7 +106,7 @@ class CmdSwitch:
     ### Handler functions for the incomming commands
     ### delegate to the corresponding operation unit
 
-    def _START(self, value: int):
+    def _START(self, value: int) -> str:
         if not self.controller.led_strip.start():
             self.print_log("ERROR occured during LED stripe initialization!")
             return json.dumps({'error': 'LED setup failed!'})
@@ -111,24 +115,24 @@ class CmdSwitch:
         s = self.controller.led_strip.get_status()
         return json.dumps({'port': self.controller.udp_server.PORT, 'state': s[0], 'brightness': s[1], 'color': s[2]})
 
-    def _STOP(self, value: int):
+    def _STOP(self, value: int) -> str:
         self.controller.udp_server.change_mode(tc.ServerOperationMode.OFF)
         self.controller.led_strip.stop()
         return "Strip operation stopped"
 
-    def _SET_COLOR(self, value: int):
+    def _SET_COLOR(self, value: int) -> str:
         self.controller.led_strip.set_color(value)
         return "color set to " + str(value)
 
-    def _SET_BRIGHTNESS(self, value: int):
+    def _SET_BRIGHTNESS(self, value: int) -> str:
         self.controller.led_strip.set_brightness(value)
         return "brightness set to " + str(value)
 
-    def _SEND_STATUS(self, value: int):
+    def _SEND_STATUS(self, value: int) -> str:
         status = self.controller.led_strip.get_strip_info_json()
         return json.dumps({'color': status[0]})
 
-    def _OPERATION_MODE(self, value: int):
+    def _OPERATION_MODE(self, value: int) -> str:
         try:
             mode = tc.ServerOperationMode(value)
         except ValueError:
@@ -137,11 +141,11 @@ class CmdSwitch:
         self.controller.led_strip.change_mode(mode)
         return 'Operation mode set to ' + mode.name
 
-    def _DISCONNECT(self, value: int):
+    def _DISCONNECT(self, value: int) -> str:
         self.controller.tcp_server.close_client_connection(self.command.connection.client_id)
-        return None
+        return ""
 
-    def _INTENSITY(self, value: int):
+    def _INTENSITY(self, value: int) -> str:
         self.controller.led_strip.set_intensity(value)
         return "Intensity set to " + str(value)
 
@@ -150,7 +154,7 @@ class CmdSwitch:
         Log.log('[CONTROLLER] ', *args, **kwargs)
 
 
-def main(args):
+def main(args: Namespace) -> None:
     # Start routine
     controller = Controller(config_path=args.config)
     controller.start()

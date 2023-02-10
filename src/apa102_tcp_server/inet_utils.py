@@ -22,27 +22,31 @@ def make_message(msg: str) -> str:
 class Client:
     id_static: int = 0
 
-    def __init__(self, ip: str, port: int, client_socket: socket.socket):
+    def __init__(self, ip: str, port: int, client_socket: socket.socket) -> None:
         self.ip = ip
         self.port = port
         self.client_id = self.id_static
         self.id_static = self.id_static + 1
         self.client_socket = client_socket
 
-    def send_message(self, msg: str):
+    def send_message(self, msg: str) -> bool:
         msg = make_message(msg)
         try:
             self.client_socket.send(msg.encode('utf-8'))
             self.print_log('==>SEND: \'', msg[4:len(msg):1], '\' to ', self.ip, ':', str(self.port))
         except OSError as e:
             self.print_log('Can\'t send message to ' + self.ip + ':' + str(self.port), ' -> ', e)
+            return False
+        return True
 
-    def close(self):
+    def close(self) -> bool:
         try:
             self.client_socket.shutdown(socket.SHUT_RDWR)
             self.client_socket.close()
         except OSError as e:
             self.print_log('Error while closing client socket: ', e)
+            return False
+        return True
 
     def print_log(self, *args, **kwargs):
         Log.log('[Client ' + str(self.client_id) + '] ', *args, **kwargs)
@@ -50,7 +54,7 @@ class Client:
 
 # TCP command container with the client, who sent the command
 class Command:
-    def __init__(self, cmd, val, connection: Client):
+    def __init__(self, cmd, val, connection: Client) -> None:
         self.command = cmd
         self.value = val
         self.connection = connection
@@ -92,15 +96,6 @@ class Spectrum():
     bass: int
     mid: int
     treb: int
-
-    def __getitem__(self, item):
-        if item == 0:
-            return self.bass
-        if item == 1:
-            return self.mid
-        if item == 2:
-            return self.treb
-        raise IndexError
 
     def __init__(self, bass: int = 0, mid: int = 0, treb: int = 0) -> None:
         self.bass = bass

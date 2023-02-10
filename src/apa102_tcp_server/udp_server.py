@@ -3,6 +3,7 @@ import socket
 import threading
 import re
 import json
+from typing import Callable
 import apa102_tcp_server.inet_utils as tc
 from apa102_tcp_server.log import Log
 from apa102_tcp_server.config_laoder import ConfigLoader
@@ -29,19 +30,19 @@ class UdpServer:
     waiting_for_notification = False
 
     def __init__(self, cl: ConfigLoader, server_mode: tc.ServerOperationMode,
-                 stream_data_function, buffer_size: int = 256):
+                 stream_data_function, buffer_size: int = 256) -> None:
         self.PORT: int = cl['udp.port'],
-        self.BUFFER_SIZE = buffer_size
-        self.mode = server_mode
+        self.BUFFER_SIZE: int = buffer_size
+        self.mode: tc.ServerOperationMode = server_mode
         # Listener Thread
         self.thread_udp: threading.Thread = None
         self.command_worker_thread: threading.Thread = None
-        self.ident = cl['udp.server_ident'],
-        self.tcp_info = cl['tcp.port'],
+        self.ident: str = cl['udp.server_ident'],
+        self.tcp_info: int = cl['tcp.port'],
         self.processor = ProcessorBc(self.server_ident, self.tcp_info)
-        self.stream_data_function = stream_data_function
-        self.timeout_start = cl['udp.thread_start_timeout_s']
-        self.timeout_close = cl['udp.thread_close_timeout_s']
+        self.stream_data_function: Callable[[int], None] = stream_data_function
+        self.timeout_start: float = cl['udp.thread_start_timeout_s']
+        self.timeout_close: float = cl['udp.thread_close_timeout_s']
 
     def start(self) -> bool:
         # Start server listener Thread
@@ -77,7 +78,7 @@ class UdpServer:
         status = self.status()
         return status[0] and status[1]
 
-    def stop(self):
+    def stop(self) -> None:
         self.server_cancelled = True
         if self.thread_udp is not None:
             self.print_log('Waiting for server thread to end')
@@ -96,13 +97,13 @@ class UdpServer:
 
     # Tuple with status of the worker thread and server thread
     # False means not running
-    def status(self):
+    def status(self) -> tuple[bool, bool]:
         try:
             return (self.command_worker_thread.is_alive(), self.thread_udp.is_alive())
         except AttributeError:
             return (self.command_worker_thread is not None, self.thread_udp is not None)
 
-    def change_mode(self, mode: tc.ServerOperationMode):
+    def change_mode(self, mode: tc.ServerOperationMode) -> None:
         if mode == tc.ServerOperationMode.BC:
             self.processor = ProcessorBc(self.ident, self.tcp_info)
         elif mode == tc.ServerOperationMode.SOUND:
@@ -139,10 +140,10 @@ class UdpServer:
             self.message_queue.put((msg, address))
             #    self.condition_queue.notify()
 
-    def command_worker(self):
+    def command_worker(self) -> bool:
         while not self.waiting_for_notification:
             if self.server_cancelled:
-                return
+                return True
         with self.condition_worker:
             self.condition_worker.notify()
         while 1:
@@ -152,7 +153,7 @@ class UdpServer:
                 message = self.message_queue.get(block=True)
                 if self.server_cancelled:
                     self.message_queue.queue.clear()
-                    return
+                    return True
                 msg, address = message      # self.message_queue.pop()
             except IndexError as e:
                 self.print_log(f'[UDP worker] Error when accessing the command queue: \
@@ -181,7 +182,7 @@ class UdpServer:
 
 
 class ProcessorBc():
-    def __init__(self, ident: str, tcp_info: str):
+    def __init__(self, ident: str, tcp_info: str) -> None:
         self.my_info = json.dumps({'ident': ident, 'port': tcp_info})
 
     def process_message(self, msg: str) -> str:
@@ -200,7 +201,7 @@ class ProcessorBc():
 class ProcessorStream():
     PATTER_COMMAND = re.compile(r'[0-9]{1,3}:[0-9]{1,3}:[0-9]{1,3}')
 
-    def __init__(self, func_interface) -> None:
+    def __init__(self, func_interface: Callable[[int], None]) -> None:
         self.strip_interface = func_interface
 
     def process_message(self, msg: str) -> str:

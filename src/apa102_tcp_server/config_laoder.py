@@ -1,14 +1,15 @@
 import yaml
 from yaml.loader import FullLoader
-from os import path
+from os import path, PathLike
+from typing import Any
 
 
 class ConfigLoader:
-    def __init__(self, file_path=path.join(path.dirname(__file__), 'data/config.yaml')):
+    def __init__(self, file_path: str | PathLike = path.join(path.dirname(__file__), 'data/config.yaml')) -> None:
         with open(file_path, 'r') as c_file:
             self.config = yaml.load(c_file, FullLoader)
 
-    def get_key(self, keys: str, separator='.'):
+    def get_key(self, keys: str, separator: str = '.') -> Any:
         """
         returns a from the config file
         use separator ('.' by default) for nested keys
@@ -21,5 +22,5 @@ class ConfigLoader:
 
         return value
 
-    def __getitem__(self, key):
-        return self.get_key(key)
+    def __getitem__(self, key: str, separator: str) -> Any:
+        return self.get_key(key, separator)
