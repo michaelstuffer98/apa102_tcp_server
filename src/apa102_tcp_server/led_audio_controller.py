@@ -12,7 +12,7 @@ import apa102_tcp_server.inet_utils as tc
 import apa102_tcp_server.tcp_server as Tcp
 import apa102_tcp_server.udp_server as Udp
 from apa102_tcp_server.apa_led import LedStrip
-from apa102_tcp_server.config_laoder import ConfigLoader
+from apa102_tcp_server.config_loader import ConfigLoader
 
 
 # General controlling unit, handles and delegates all basic program work-flow

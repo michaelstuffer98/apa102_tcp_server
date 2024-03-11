@@ -7,7 +7,7 @@ import threading
 from typing import Callable
 
 import apa102_tcp_server.inet_utils as tc
-from apa102_tcp_server.config_laoder import ConfigLoader
+from apa102_tcp_server.config_loader import ConfigLoader
 
 
 class UdpServer:

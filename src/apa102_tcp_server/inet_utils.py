@@ -12,7 +12,7 @@ from enum import Enum
 
 
 def make_message(msg: str) -> str:
-    if type(msg) != str:
+    if not isinstance(msg, str):
         msg = str(msg)
     msg = (str(len(msg))).zfill(4) + msg
     return msg

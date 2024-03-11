@@ -5,7 +5,7 @@ from typing import List
 
 from apa102_pi.driver import apa102
 
-from apa102_tcp_server.config_laoder import ConfigLoader
+from apa102_tcp_server.config_loader import ConfigLoader
 from apa102_tcp_server.inet_utils import ServerOperationMode as Mode
 
 

@@ -1,4 +1,4 @@
-from apa102_tcp_server.config_laoder import ConfigLoader
+from apa102_tcp_server.config_loader import ConfigLoader
 import os
 import pytest
 
